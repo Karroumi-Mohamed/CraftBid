@@ -1,3 +1,12 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+
+.shadow-header-checkbox {
+  box-shadow: 0 0 0 1px rgba(36, 39, 43, .4);
+}
+
+.shadow-data-checkbox {
+  box-shadow: 0 0 0 1px rgba(36, 39, 43, 1);
+}
