@@ -1,32 +1,12 @@
 import React from 'react';
 import LoginForm from '../components/auth/LoginForm';
 import { Link } from 'react-router-dom';
-import CarouselIndicator from '../components/utils/CarouselIndicator';
+import AuthLayout from '../components/layouts/AuthLayout';
 
 const LoginPage: React.FC = () => {
     return (
-        <div className="flex flex-row gap-2 items-center justify-center h-screen bg-black p-2">
-            <div className="hidden relative h-full lg:flex lg:w-3/5 xl:w-1/2 flex-col justify-end overflow-hidden text-white rounded-lg">
-
-                <img
-                    src="/auth/sideImage_1.jpg"
-                    className="h-full object-cover object-center"
-                    alt="Side"
-                />
-
-                <div className="absolute inset-0 z-10 flex flex-col justify-between p-4 pointer-events-none">
-                    <div className="flex h-full w-full justify-end items-center flex-col mb-5 gap-6 pointer-events-auto">
-                        <img src="/public/auth/sideIcon_1.png" className='size-14' />
-                        <h1 className="text-5xl  text-center pointer-events-auto font-bodoni font-black text-transparent bg-clip-text bg-gradient-to-b from-blancasi-500 to-[#77FFED]">
-                            Experience The Souk Modernized
-                        </h1>
-                        <CarouselIndicator count={3} currentIndex={0} onClick={() => { }} />
-                    </div>
-
-                </div>
-            </div>
-
-            <div className="w-full h-full ml-auto p-5 rounded-lg shadow-md bg-white font-montserrat">
+        <AuthLayout>
+            <>
                 <div className='flex justify-between items-center'>
                     <div className='pl-2'>
                         <img src="/public/logo.png" className="h-10 " alt="Logo" />
@@ -69,8 +49,8 @@ const LoginPage: React.FC = () => {
                         </Link>
                     </div>
                 </div>
-            </div>
-        </div>
+            </>
+        </AuthLayout>
     );
 };
 

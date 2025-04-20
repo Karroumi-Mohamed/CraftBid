@@ -1,26 +1,33 @@
 import React from 'react';
-import RegisterForm from '../components/auth/RegisterForm'; // Import the form
-import { Link } from 'react-router-dom'; // Import Link
+import RegisterForm from '../components/auth/RegisterForm';
+import { Link } from 'react-router-dom';
+import AuthLayout from '../components/layouts/AuthLayout';
 
 const RegisterPage: React.FC = () => {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gray-100 px-4 py-12 sm:px-6 lg:px-8">
-      <div className="w-full max-w-md space-y-8">
-         <div>
-          {/* Add Logo here if needed */}
-          <h2 className="mt-6 text-center text-3xl font-bold tracking-tight text-gray-900">
-            Create your account
-          </h2>
-        </div>
-        <RegisterForm /> {/* Render the form */}
-         <p className="mt-2 text-center text-sm text-gray-600">
-          Already have an account?{' '}
-          <Link to="/login" className="font-medium text-indigo-600 hover:text-indigo-500">
-            Sign in
-          </Link>
-        </p>
-      </div>
-    </div>
+    <AuthLayout>
+        <>
+            <div className='flex justify-between items-center'>
+                <div className='pl-2'>
+                    <img src="/public/logo.png" className="h-10 " alt="Logo" />
+                </div>
+                <p className='font-medium'>
+                    Already have an account? <Link to="/login" className="text-accent1 underline">Sign In</Link>
+                </p>
+            </div>
+            <div className='flex flex-col items-center justify-center w-fit mx-auto'>
+
+                <div className='flex flex-col items-center justify-center w-full mt-20'>
+                    <h1 className='text-black text-2xl font-bold'>Create your CraftBid account</h1>
+                    <p className='text-lg font-semibold text-gray-400 px-10 '>Join our community of artisans and bidders</p>
+                </div>
+
+                <div className='flex flex-col items-center justify-center w-full mt-8'>
+                    <RegisterForm />
+                </div>
+            </div>
+        </>
+    </AuthLayout>
   );
 };
 

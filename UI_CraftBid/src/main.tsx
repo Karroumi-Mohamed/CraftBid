@@ -10,7 +10,6 @@ import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import { AuthProvider } from './contexts/AuthContext';
 import ProtectedRoute from './components/auth/ProtectedRoute';
-import LoginPageTesting from './pages/LoginPageTesting';
 
 
 const router = createBrowserRouter([
@@ -24,7 +23,7 @@ const router = createBrowserRouter([
   },
   {
     path: "/login",
-    element: <LoginPageTesting />,
+    element: <LoginPage />,
   },
   {
     path: "/register",
