@@ -20,7 +20,7 @@
       "@/*": [
         "./src/*"
       ]
-    }
+    },
 
     /* Linting */
     "strict": true,
