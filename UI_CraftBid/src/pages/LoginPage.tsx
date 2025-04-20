@@ -7,7 +7,7 @@ const LoginPage: React.FC = () => {
     return (
         <AuthLayout>
             <>
-                <div className='flex justify-between items-center'>
+                <div className='flex justify-between items-center p-5'>
                     <div className='pl-2'>
                         <img src="/public/logo.png" className="h-10 " alt="Logo" />
                     </div>

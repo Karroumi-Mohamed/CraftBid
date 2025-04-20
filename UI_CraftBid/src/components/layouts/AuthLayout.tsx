@@ -3,7 +3,7 @@ import CarouselIndicator from '../utils/CarouselIndicator';
 
 const slides = [
     {
-        mainImage: "/auth/sideImage_1.jpg",
+        mainImage: "/auth/sideImage_3.jpg",
         iconImage: "/public/auth/sideIcon_1.png",
         text: "Experience The Souk Modernized"
     },
@@ -13,7 +13,7 @@ const slides = [
         text: "Discover Artisans of Morocco"
     },
     {
-        mainImage: "/auth/sideImage_3.jpg",
+        mainImage: "/auth/sideImage_1.jpg",
         iconImage: "/public/auth/sideIcon_3.png",
         text: "Bid, Win, Bring Culture Home"
     }
@@ -69,7 +69,7 @@ const AuthLayout: React.FC<AuthLayoutProps> = ({ children }) => {
                                 alt={`Slide ${index + 1}`}
                             />
                             <div className="absolute inset-0 z-10 flex flex-col justify-between p-4 pointer-events-none">
-                                <div className="flex h-full w-full justify-end items-center flex-col mb-5 gap-6 pointer-events-auto">
+                                <div className="flex h-full w-full justify-end items-center flex-col mb-10 gap-3 pointer-events-auto">
                                     <img src={slide.iconImage} className='size-14' alt="Slide Icon"/>
                                     <h1 className="text-5xl text-center pointer-events-auto font-bodoni font-black text-transparent bg-clip-text bg-gradient-to-b from-blancasi-500 to-[#77FFED]">
                                         {slide.text}
@@ -89,7 +89,7 @@ const AuthLayout: React.FC<AuthLayoutProps> = ({ children }) => {
                  </div>
             </div>
 
-            <div className="w-full h-full ml-auto p-5 rounded-lg shadow-md bg-white font-montserrat">
+            <div className="w-full h-full ml-auto rounded-lg shadow-md bg-white font-montserrat">
                 {children}
             </div>
         </div>
