@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import axios from 'axios'; // Keep for type checking
+import axios from 'axios';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 
@@ -7,7 +7,7 @@ const RegisterForm: React.FC = () => {
     const { register } = useAuth();
     const navigate = useNavigate();
 
-    const [step, setStep] = useState(1); // Step 1: Role selection, Step 2: Details
+    const [step, setStep] = useState(1);
     const [role, setRole] = useState<'buyer' | 'artisan' | ''>('');
     const [name, setName] = useState('');
     const [email, setEmail] = useState('');
@@ -19,7 +19,6 @@ const RegisterForm: React.FC = () => {
 
     const handleRoleSelect = (selectedRole: 'buyer' | 'artisan') => {
         setRole(selectedRole);
-        // Keep the user on Step 1 until they click "Next"
         setError(null);
         setSuccessMessage(null);
     };
@@ -45,22 +44,20 @@ const RegisterForm: React.FC = () => {
         }
 
         try {
-            const response = await register({ // Use register function from context
+            const response = await register({
                 name,
                 email,
                 password,
                 password_confirmation: passwordConfirmation,
                 role,
             });
-
             console.log('Registration successful:', response.data);
             setSuccessMessage(response.data.message || 'Registration successful! Please check your email to verify.');
-            // Clear form fields after successful registration
             setName('');
             setEmail('');
             setPassword('');
             setPasswordConfirmation('');
-            setStep(3); // Move to a success/confirmation step
+            setStep(3);
 
         } catch (err: any) {
             console.error('Registration error:', err);
@@ -88,7 +85,6 @@ const RegisterForm: React.FC = () => {
             {step === 1 && (
                 <div className="flex flex-col items-center">
                     <div className="flex flex-col sm:flex-row justify-center items-start gap-8 mb-6">
-                        {/* Buyer Option */}
                         <div className="flex flex-col items-center text-center w-48">
                             <button
                                 type="button"
