@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 
 class AuthController extends Controller
 {
@@ -16,12 +17,41 @@ class AuthController extends Controller
             'password' => 'required|string|min:8|confirmed',
         ]);
 
-        User::create([
+        $user = User::create([
             'name' => $fields['name'],
             'email' => $fields['email'],
-            'role' => $fields['role'],
             'password' => bcrypt($fields['password']),
         ]);
+
+        $user->assignRole($fields['role']);
+
+
+        //TODO
+        // $user->createWallet();
+
+        return response([
+            'user' => $user,
+        ], 201);
     }
-    public function login() {}
+    public function login(Request $request) {
+        $fields = $request->validate([
+            'email' => 'required|string|email',
+            'password' => 'required|string',
+        ]);
+
+
+        if (!Auth::attempt($fields)) {
+            return response([
+                'message' => 'Invalid credentials'
+            ], 401);
+        }
+
+
+        $user = Auth::user();
+        $request->session()->regenerate();
+        return response([
+            'user' => $user,
+        ], 200);
+
+    }
 }
