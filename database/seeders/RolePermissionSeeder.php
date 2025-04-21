@@ -38,11 +38,46 @@ class RolePermissionSeeder extends Seeder
             'product',
             'order',
             'category',
+            'bid'
         ];
-        foreach ($permissions as $permission) {
-            Role
-        }
 
+        $adminPermissions = [
+            'create',
+            'read',
+            'update',
+            'delete',
+            'approve',
+            'user',
+            'role',
+            'permission',
+            'product',
+            'order',
+            'category',
+            'bid'
+        ];
+
+        $verifierPermissions = [
+            'read',
+            'approve',
+            'user',
+        ];
+        $buyerPermissions = [
+            'read',
+            'create',
+            'update',
+            'delete',
+            'order',
+            'product',
+            'bid',
+        ];
+        $artisanPermissions = [
+            'read',
+            'create',
+            'update',
+            'delete',
+            'product',
+            'bid',
+        ];
 
     }
 }
