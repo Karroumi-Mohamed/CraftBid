@@ -32,7 +32,7 @@ const BusinessVerificationPage: React.FC = () => {
     navigate('/dashboard');
   };
 
-  const isAllVerified = false; // Always false since states are fixed to pending
+  const isAllVerified = false; 
 
   const getEmailStatusLabel = () => {
     return 'Pending';
