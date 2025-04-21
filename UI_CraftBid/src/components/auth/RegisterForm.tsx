@@ -83,32 +83,32 @@ const RegisterForm: React.FC = () => {
             {error && step === 2 && <div className="text-red-500 bg-red-100 p-3 rounded mb-4 text-sm">{error}</div>}
 
             {step === 1 && (
-                <div className="flex flex-col items-center">
-                    <div className="flex flex-col sm:flex-row justify-center items-start gap-8 mb-6">
-                        <div className="flex flex-col items-center text-center w-48">
+                <div className="flex flex-col items-center mt-10">
+                    <div className="flex flex-col sm:flex-row justify-center items-start gap-16">
+                        <div className="flex flex-col items-center text-center w-40">
                             <button
                                 type="button"
                                 onClick={() => handleRoleSelect('buyer')}
-                                className={`relative border rounded-lg focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-accent2 w-full h-48 overflow-hidden ${role === 'buyer' ? 'ring-2 ring-accent2' : 'border-gray-300'}`}
+                                className={`relative border rounded-lg focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-accent2 w-full h-44 overflow-hidden ${role === 'buyer' ? 'ring-2 ring-accent2' : 'border-gray-300'}`}
                             >
                                 <img src="/public/auth/buyer.png" className="w-full h-full object-cover" alt="Buyer icon" />
                                 {role === 'buyer' && (
-                                    <div className="absolute top-2 left-2 w-5 h-5 bg-accent2 rounded-full border-2 border-white flex items-center justify-center">
+                                    <div className="absolute top-2 left-2 w-5 h-5 bg-accent2 rounded-full border-4 border-black flex items-center justify-center">
                                     </div>
                                 )}
                             </button>
                             <span className="font-bold block mt-3">Buyer</span>
                         </div>
 
-                        <div className="flex flex-col items-center text-center w-48">
+                        <div className="flex flex-col items-center text-center w-40">
                             <button
                                 type="button"
                                 onClick={() => handleRoleSelect('artisan')}
-                                className={`relative border rounded-lg focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-accent2 w-full h-48 overflow-hidden flex items-center justify-center bg-gray-100 ${role === 'artisan' ? 'ring-2 ring-accent2' : 'border-gray-300'}`}
+                                className={`relative border rounded-lg focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-accent2 w-full h-44 overflow-hidden flex items-center justify-center bg-gray-100 ${role === 'artisan' ? 'ring-2 ring-accent2' : 'border-gray-300'}`}
                             >
                                 <img src="/public/auth/artisan.png" className="w-full h-full object-cover" alt="Artisan icon" />
                                 {role === 'artisan' && (
-                                    <div className="absolute top-2 left-2 w-5 h-5 bg-accent2 rounded-full border-2 border-white flex items-center justify-center">
+                                    <div className="absolute top-2 left-2 w-5 h-5 bg-accent2 rounded-full border-4 border-black flex items-center justify-center">
                                     </div>
                                 )}
                             </button>
@@ -119,7 +119,7 @@ const RegisterForm: React.FC = () => {
                         type="button"
                         onClick={handleNextStep}
                         disabled={!role}
-                        className="py-2 px-6 text-lg font-semibold text-accent1 focus:outline-none  disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer "
+                        className="py-2 px-6 text-lg font-semibold text-black focus:outline-none  disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer "
                     >
                         Next
                     </button>
