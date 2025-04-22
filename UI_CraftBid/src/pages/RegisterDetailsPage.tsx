@@ -2,6 +2,19 @@ import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { ArrowRight, ArrowLeft } from "lucide-react";
+import { InputWithError } from '@/components/ui/InputWithError'; // Import the new component
+import { ValidationErrors } from '@/lib/axois'; // Import ValidationErrors type
+
+// Define a type for the error state object
+// Make all expected fields optional strings (we'll take the first error message)
+interface RegistrationErrors {
+  name?: string;
+  email?: string;
+  password?: string;
+  password_confirmation?: string;
+  general?: string; // For non-field specific errors or general messages
+}
+
 
 const RegisterDetailsPage: React.FC = () => {
   const location = useLocation();
@@ -20,19 +33,20 @@ const RegisterDetailsPage: React.FC = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [passwordConfirmation, setPasswordConfirmation] = useState('');
-  const [error, setError] = useState<string | null>(null);
+  // Use the new RegistrationErrors type for state
+  const [errors, setErrors] = useState<RegistrationErrors>({});
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!role) return;
-    setError(null);
+    setErrors({}); // Clear previous errors
     setLoading(true);
 
     if (password !== passwordConfirmation) {
-      setError('Passwords do not match.');
-      setLoading(false);
-      setLoading(false);
+      // Set specific error for password confirmation
+      setErrors(prev => ({ ...prev, password_confirmation: 'Passwords do not match.' }));
+      setLoading(false); // Stop loading if passwords don't match
       return;
     }
 
@@ -54,13 +68,25 @@ const RegisterDetailsPage: React.FC = () => {
     } else {
       // Registration failed (API returned error)
       console.error('Registration error:', response.error);
-      // Check if the error object contains validation errors
+      // Check if the error object contains validation errors (ValidationErrors type)
       if (response.error?.errors) {
-        const messages = Object.values(response.error.errors).flat().join(' ');
-        setError(messages || 'Validation failed.');
+         const apiErrors = response.error.errors as ValidationErrors;
+         const newErrors: RegistrationErrors = {};
+         for (const field in apiErrors) {
+           if (apiErrors[field] && apiErrors[field].length > 0) {
+             // Take the first error message for each field
+             newErrors[field as keyof RegistrationErrors] = apiErrors[field][0];
+           }
+         }
+         // Handle password confirmation specifically if backend uses 'password' key for confirmation rule
+         if (newErrors.password && newErrors.password.toLowerCase().includes('confirmation')) {
+            newErrors.password_confirmation = newErrors.password;
+            delete newErrors.password; // Avoid showing confirmation error under main password field
+         }
+         setErrors(newErrors);
       } else {
-        // Use the general error message
-        setError(response.error?.message || 'An unexpected error occurred during registration.');
+        // Use the general error message and assign it to the 'general' key
+        setErrors({ general: response.error?.message || 'An unexpected error occurred during registration.' });
       }
     }
   };
@@ -82,73 +108,65 @@ const RegisterDetailsPage: React.FC = () => {
         <h1 className='text-black text-2xl font-bold mt-10 w-full text-center'>Sign up as {role === 'artisan' ? 'an' : 'a'} {role.charAt(0).toUpperCase() + role.slice(1)}</h1>
         <p className='text-gray-500 text-sm font-medium mt-1 mb-6 w-full text-center'>Please fill in your data</p>
 
-        {error && <div className="text-red-500 bg-red-100 p-3 rounded mb-4 text-sm w-full">{error}</div>}
+        {/* Display general errors */}
+        {errors.general && <div className="text-red-500 bg-red-100 p-3 rounded mb-4 text-sm w-full">{errors.general}</div>}
 
         <form onSubmit={handleSubmit} className='space-y-5 w-full'>
           <input type='hidden' value={role} name='role' />
 
-          <div>
-            <label htmlFor='name' className='block text-sm font-medium text-gray-700 mb-1'>
-              {role === 'artisan' ? 'Business name' : 'Name'}
-            </label>
-            <input
-              id='name'
-              name='name'
-              type='text'
-              placeholder={role === 'artisan' ? 'Your business name' : 'John Doe'}
-              required
-              className='block w-full px-4 py-3 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-accent1 focus:border-accent1'
-              value={name}
-              onChange={e => setName(e.target.value)}
-              disabled={loading}
-            />
-          </div>
+          {/* Use InputWithError component */}
+          <InputWithError
+            id='name'
+            name='name'
+            type='text'
+            label={role === 'artisan' ? 'Business name' : 'Name'}
+            placeholder={role === 'artisan' ? 'Your business name' : 'John Doe'}
+            required
+            value={name}
+            onChange={e => setName(e.target.value)}
+            disabled={loading}
+            error={errors.name} // Pass the specific error for this field
+          />
 
-          <div>
-            <label htmlFor='email' className='block text-sm font-medium text-gray-700 mb-1'>Email</label>
-            <input
-              id='email'
-              name='email'
-              type='email'
-              placeholder='johndeo@gmail.com'
-              autoComplete='email'
-              required
-              className='block w-full px-4 py-3 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-accent1 focus:border-accent1'
-              value={email}
-              onChange={e => setEmail(e.target.value)}
-              disabled={loading}
-            />
-          </div>
+          <InputWithError
+            id='email'
+            name='email'
+            type='email'
+            label='Email'
+            placeholder='johndeo@gmail.com'
+            autoComplete='email'
+            required
+            value={email}
+            onChange={e => setEmail(e.target.value)}
+            disabled={loading}
+            error={errors.email} // Pass the specific error for this field
+          />
 
-          <div>
-            <label htmlFor='password' className='block text-sm font-medium text-gray-700 mb-1'>Password</label>
-            <input
-              id='password'
-              name='password'
-              type='password'
-              placeholder='minimum 8 characters'
-              required
-              className='block w-full px-4 py-3 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-accent1 focus:border-accent1'
-              value={password}
-              onChange={e => setPassword(e.target.value)}
-              disabled={loading}
-            />
-          </div>
+          <InputWithError
+            id='password'
+            name='password'
+            type='password'
+            label='Password'
+            placeholder='minimum 8 characters'
+            required
+            value={password}
+            onChange={e => setPassword(e.target.value)}
+            disabled={loading}
+            error={errors.password} // Pass the specific error for this field
+          />
 
-          <div>
-            <label htmlFor='password_confirmation' className='block text-sm font-medium text-gray-700 mb-1'>Confirm Password</label>
-            <input
-              id='password_confirmation'
-              name='password_confirmation'
-              type='password'
-              placeholder='retype your password'
-              required
-              className='block w-full px-4 py-3 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-accent1 focus:border-accent1'
-              value={passwordConfirmation}
-              onChange={e => setPasswordConfirmation(e.target.value)}
-              disabled={loading}
-            />
-          </div>
+          <InputWithError
+            id='password_confirmation'
+            name='password_confirmation'
+            type='password'
+            label='Confirm Password'
+            placeholder='retype your password'
+            required
+            value={passwordConfirmation}
+            onChange={e => setPasswordConfirmation(e.target.value)}
+            disabled={loading}
+            error={errors.password_confirmation} // Pass the specific error for this field
+          />
 
           <div className="flex gap-4 items-center">
             <button
