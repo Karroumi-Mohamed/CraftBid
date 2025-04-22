@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
-import axios from 'axios';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
+import { ValidationErrors } from '../../lib/axois';
 
 const RegisterForm: React.FC = () => {
     const { register } = useAuth();
@@ -14,12 +14,26 @@ const RegisterForm: React.FC = () => {
     const [password, setPassword] = useState('');
     const [passwordConfirmation, setPasswordConfirmation] = useState('');
     const [error, setError] = useState<string | null>(null);
+    const [fieldErrors, setFieldErrors] = useState<ValidationErrors | null>(null);
     const [successMessage, setSuccessMessage] = useState<string | null>(null);
     const [loading, setLoading] = useState(false);
+    const [debugInfo, setDebugInfo] = useState<any>(null);
+
+    useEffect(() => {
+        console.log("RegisterForm state:", {
+            step,
+            role,
+            error,
+            fieldErrors,
+            loading,
+            successMessage
+        });
+    }, [step, role, error, fieldErrors, loading, successMessage]);
 
     const handleRoleSelect = (selectedRole: 'buyer' | 'artisan') => {
         setRole(selectedRole);
         setError(null);
+        setFieldErrors(null);
         setSuccessMessage(null);
     };
 
@@ -34,8 +48,10 @@ const RegisterForm: React.FC = () => {
         if (step !== 2 || !role) return;
 
         setError(null);
+        setFieldErrors(null);
         setSuccessMessage(null);
         setLoading(true);
+        setDebugInfo(null);
 
         if (password !== passwordConfirmation) {
             setError("Passwords do not match.");
@@ -43,44 +59,78 @@ const RegisterForm: React.FC = () => {
             return;
         }
 
+        const registrationData = {
+            name,
+            email,
+            password,
+            password_confirmation: passwordConfirmation,
+            role,
+        };
+        
+        console.log("REGISTER FORM: Submitting registration with data:", { 
+            ...registrationData, 
+            password: "[REDACTED]",
+            password_confirmation: "[REDACTED]" 
+        });
+        
         try {
-            const response = await register({
-                name,
-                email,
-                password,
-                password_confirmation: passwordConfirmation,
-                role,
+            const response = await register(registrationData);
+            
+            setDebugInfo(response);
+            
+            console.log("REGISTER FORM: Complete response from register:", {
+                success: response.success,
+                status: response.status,
+                data: response.data,
+                error: response.error
             });
-            console.log('Registration successful:', response.data);
-            setSuccessMessage(response.data.message || 'Registration successful! Please check your email to verify.');
-            setName('');
-            setEmail('');
-            setPassword('');
-            setPasswordConfirmation('');
-            setStep(3);
-
-        } catch (err: any) {
-            console.error('Registration error:', err);
-            if (axios.isAxiosError(err) && err.response) {
-                if (err.response.status === 422) {
-                    const messages = Object.values(err.response.data.errors || {}).flat().join(' ');
-                    setError(messages || 'Validation failed.');
-                } else {
-                    setError(err.response.data.message || 'An error occurred during registration.');
-                }
-            } else if (err instanceof Error) {
-                setError(err.message);
-            } else {
-                setError('An unexpected error occurred.');
-            }
-        } finally {
+            
             setLoading(false);
+            
+            if (response.success === true && response.data) {
+                console.log("REGISTER FORM: Registration successful, showing success message");
+                setSuccessMessage(response.data?.message || 'Registration successful! Please check your email to verify.');
+                setName('');
+                setEmail('');
+                setPassword('');
+                setPasswordConfirmation('');
+                setStep(3);
+            } else {
+                console.error("REGISTER FORM: Registration failed:", response.error);
+                
+                if (response.status === 422 && response.error?.errors) {
+                    console.log("REGISTER FORM: Validation errors detected:", response.error.errors);
+                    setFieldErrors(response.error.errors);
+                    setError("Please correct the errors below.");
+                } else {
+                    setError(response.error?.message || 'An error occurred during registration.');
+                }
+            }
+        } catch (e) {
+            console.error("REGISTER FORM: Unexpected error during registration:", e);
+            setLoading(false);
+            setError("An unexpected error occurred. Please try again.");
         }
     };
 
     return (
         <div>
-            {error && step === 2 && <div className="text-red-500 bg-red-100 p-3 rounded mb-4 text-sm">{error}</div>}
+            {process.env.NODE_ENV === 'development' && debugInfo && (
+                <details className="mb-4 p-2 border rounded">
+                    <summary className="font-bold text-xs">Debug Info (Dev Only)</summary>
+                    <pre className="text-xs mt-2 overflow-auto max-h-40">
+                        {JSON.stringify({
+                            success: debugInfo.success,
+                            status: debugInfo.status,
+                            error: debugInfo.error
+                        }, null, 2)}
+                    </pre>
+                </details>
+            )}
+
+            {error && step === 2 && (
+                <div className="text-red-500 bg-red-100 p-3 rounded mb-4 text-sm">{error}</div>
+            )}
 
             {step === 1 && (
                 <div className="flex flex-col items-center mt-10">
@@ -132,19 +182,60 @@ const RegisterForm: React.FC = () => {
                     <h3 className="text-lg font-medium text-gray-700">Enter your details ({role})</h3>
                     <div>
                         <label htmlFor="name" className="block text-sm font-medium text-gray-700">Full Name</label>
-                        <input id="name" name="name" type="text" required className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" value={name} onChange={(e) => setName(e.target.value)} disabled={loading} />
+                        <input 
+                            id="name" 
+                            name="name" 
+                            type="text" 
+                            required 
+                            className={`mt-1 block w-full px-3 py-2 border rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 sm:text-sm ${fieldErrors?.name ? 'border-red-500' : 'border-gray-300'}`}
+                            value={name} 
+                            onChange={(e) => setName(e.target.value)} 
+                            disabled={loading} 
+                        />
+                        {fieldErrors?.name && <p className="text-red-500 text-xs mt-1">{fieldErrors.name[0]}</p>}
                     </div>
                     <div>
                         <label htmlFor="email" className="block text-sm font-medium text-gray-700">Email address</label>
-                        <input id="email" name="email" type="email" autoComplete="email" required className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" value={email} onChange={(e) => setEmail(e.target.value)} disabled={loading} />
+                        <input 
+                            id="email" 
+                            name="email" 
+                            type="email" 
+                            autoComplete="email" 
+                            required 
+                            className={`mt-1 block w-full px-3 py-2 border rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 sm:text-sm ${fieldErrors?.email ? 'border-red-500' : 'border-gray-300'}`}
+                            value={email} 
+                            onChange={(e) => setEmail(e.target.value)} 
+                            disabled={loading} 
+                        />
+                        {fieldErrors?.email && <p className="text-red-500 text-xs mt-1">{fieldErrors.email[0]}</p>}
                     </div>
                     <div>
                         <label htmlFor="password" className="block text-sm font-medium text-gray-700">Password</label>
-                        <input id="password" name="password" type="password" required className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" value={password} onChange={(e) => setPassword(e.target.value)} disabled={loading} />
+                        <input 
+                            id="password" 
+                            name="password" 
+                            type="password" 
+                            required 
+                            className={`mt-1 block w-full px-3 py-2 border rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 sm:text-sm ${fieldErrors?.password ? 'border-red-500' : 'border-gray-300'}`}
+                            value={password} 
+                            onChange={(e) => setPassword(e.target.value)} 
+                            disabled={loading} 
+                        />
+                        {fieldErrors?.password && <p className="text-red-500 text-xs mt-1">{fieldErrors.password[0]}</p>}
                     </div>
                     <div>
                         <label htmlFor="password_confirmation" className="block text-sm font-medium text-gray-700">Confirm Password</label>
-                        <input id="password_confirmation" name="password_confirmation" type="password" required className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" value={passwordConfirmation} onChange={(e) => setPasswordConfirmation(e.target.value)} disabled={loading} />
+                        <input 
+                            id="password_confirmation" 
+                            name="password_confirmation" 
+                            type="password" 
+                            required 
+                            className={`mt-1 block w-full px-3 py-2 border rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 sm:text-sm ${fieldErrors?.password_confirmation ? 'border-red-500' : 'border-gray-300'}`}
+                            value={passwordConfirmation} 
+                            onChange={(e) => setPasswordConfirmation(e.target.value)} 
+                            disabled={loading} 
+                        />
+                        {fieldErrors?.password_confirmation && <p className="text-red-500 text-xs mt-1">{fieldErrors.password_confirmation[0]}</p>}
                     </div>
                     <div className="flex items-center justify-between pt-2">
                         <button type="button" onClick={() => setStep(1)} className="text-sm font-medium text-indigo-600 hover:text-indigo-500 disabled:opacity-50" disabled={loading}>Back to role selection</button>

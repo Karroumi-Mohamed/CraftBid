@@ -1,45 +1,68 @@
 import React, { createContext, useState, useContext, ReactNode, useEffect } from 'react';
 import axios from 'axios';
+import api, { makeRequest, ApiResponse, ApiError } from '../lib/axois';
 
 interface User {
   id: number;
   name: string;
   email: string;
   roles: { id: number; name: string }[];
+  email_verified_at: string | null;
 }
 
 interface AuthContextType {
   user: User | null;
   setUser: React.Dispatch<React.SetStateAction<User | null>>;
   isLoading: boolean;
-  login: (credentials: {email: string, password: string}) => Promise<User>;
-  logout: () => Promise<void>;
-  register: (data: any) => Promise<any>;
-  checkAuthStatus: () => Promise<void>;
-  checkEmailVerification: (data: { token: string; email: string }) => Promise<any>;
-  resendVerificationEmail: (data: { email: string }) => Promise<any>;
+  isVerified: boolean;
+  login: (credentials: {email: string, password: string}) => Promise<ApiResponse<User> & { verificationRequired?: boolean }>;
+  logout: () => Promise<ApiResponse<any>>;
+  register: (data: any) => Promise<ApiResponse<any>>;
+  checkAuthStatus: () => Promise<ApiResponse<User> & { verificationRequired?: boolean }>;
+  checkEmailVerification: (data: { id: string; hash: string }) => Promise<ApiResponse<any>>;
+  resendVerificationEmail: (data: { email: string }) => Promise<ApiResponse<any>>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+const BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000';
+
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isVerified, setIsVerified] = useState(false);
 
-  const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000';
-
-  const checkAuthStatus = async () => {
+  const checkAuthStatus = async (): Promise<ApiResponse<User> & { verificationRequired?: boolean }> => {
     setIsLoading(true);
     try {
-      const response = await axios.get(`${API_BASE_URL}/api/user`);
-      setUser(response.data);
-      return response.data;
+      const response = await makeRequest<User>(api.get('/user'));
+      
+      if (response.success && response.data) {
+        setUser(response.data);
+        setIsVerified(!!response.data.email_verified_at);
+        setIsLoading(false);
+        return { ...response, verificationRequired: !response.data.email_verified_at };
+      } else {
+        setUser(null);
+        setIsVerified(false);
+        const verificationRequired = response.status === 409;
+        if (!verificationRequired && response.status !== 401 && response.status !== 419) {
+          console.error("Auth check failed:", response.error);
+        }
+        setIsLoading(false);
+        return { ...response, verificationRequired };
+      }
     } catch (error) {
       setUser(null);
-      console.error("Not authenticated:", error);
-      return null;
-    } finally {
+      setIsVerified(false);
       setIsLoading(false);
+      return {
+        success: false,
+        data: null,
+        error: { message: 'Failed to check authentication status' },
+        status: 500,
+        verificationRequired: false
+      };
     }
   };
 
@@ -47,66 +70,158 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     checkAuthStatus();
   }, []);
 
-  const login = async (credentials: {email: string, password: string}): Promise<User> => {
+  const login = async (credentials: {email: string, password: string}): Promise<ApiResponse<User> & { verificationRequired?: boolean }> => {
     setIsLoading(true);
+    setUser(null);
+    setIsVerified(false);
+    
     try {
-      await axios.get(`${API_BASE_URL}/sanctum/csrf-cookie`);
+      await axios.get(`${BASE_URL}/sanctum/csrf-cookie`);
+      
+      const loginAttemptResponse = await makeRequest(api.post('/login', credentials));
 
-      await axios.post(`${API_BASE_URL}/login`, credentials, {
-          headers: { 'Accept': 'application/json' }
-      });
-
-      const loggedInUser = await checkAuthStatus();
-      if (!loggedInUser) {
-          throw new Error('Login succeeded but failed to fetch user data.');
+      if (!loginAttemptResponse.success) {
+        setIsLoading(false);
+        console.error("Login attempt failed:", loginAttemptResponse.error);
+        return { ...loginAttemptResponse, verificationRequired: false };
       }
-      return loggedInUser;
-    } catch (error) {
-       setUser(null);
-       console.error("Login failed:", error);
-       throw error;
-    } finally {
-       setIsLoading(false);
+
+      const authResponse = await checkAuthStatus();
+      setIsLoading(false);
+      
+      if (!authResponse.success) {
+         if (authResponse.verificationRequired) {
+            setUser({ email: credentials.email } as User);
+            setIsVerified(false);
+            return { 
+              success: false,
+              data: null, 
+              error: authResponse.error || { message: 'Email verification required.' }, 
+              status: authResponse.status, 
+              verificationRequired: true 
+            };
+         }
+         return { 
+           ...authResponse, 
+           error: authResponse.error || { message: "Login succeeded but failed to fetch user data" },
+           verificationRequired: false
+         };
+      }
+      
+      return { ...authResponse, verificationRequired: false };
+
+    } catch (csrfError: any) {
+      console.error("CSRF token fetch failed:", csrfError);
+      setIsLoading(false);
+      return { 
+        success: false, 
+        data: null, 
+        error: {
+          message: "Authentication setup failed. Please try again.",
+          status: csrfError.response?.status
+        },
+        status: csrfError.response?.status,
+        verificationRequired: false
+      };
     }
   };
 
-  const logout = async () => {
-     setIsLoading(true);
-     try {
-        await axios.post(`${API_BASE_URL}/logout`);
-        setUser(null);
-     } catch (error) {
-        console.error("Logout failed:", error);
-        setUser(null);
-        throw error;
-     } finally {
-        setIsLoading(false);
-     }
+  const logout = async (): Promise<ApiResponse<any>> => {
+    setIsLoading(true);
+    try {
+      const response = await makeRequest(api.post('/logout'));
+      
+      setUser(null);
+      setIsVerified(false);
+      setIsLoading(false);
+      return response;
+    } catch (error: any) {
+      console.error("Logout failed:", error);
+      setUser(null);
+      setIsVerified(false);
+      setIsLoading(false);
+      
+      let apiError: ApiError;
+      if (error.status !== undefined) {
+        apiError = error;
+      } else {
+        apiError = { 
+          message: error.message || "An unexpected error occurred during logout",
+          status: error.response?.status
+        };
+      }
+      
+      return { 
+        success: false, 
+        data: null, 
+        error: apiError, 
+        status: apiError.status
+      };
+    }
   };
 
-   const register = async (data: any) => {
-     return axios.post(`${API_BASE_URL}/api/register`, data);
-   };
+  const register = async (data: any): Promise<ApiResponse<any>> => {
+    setIsLoading(true);
+    const response = await makeRequest(api.post('/register', data));
+    setIsLoading(false);
+    return response;
+  };
 
-   const checkEmailVerification = async (data: { token: string; email: string }) => {
-     try {
-       const response = await axios.post(`${API_BASE_URL}/verify-email`, data);
-       return response;
-     } catch (error) {
-       throw error;
-     }
-   };
+  const checkEmailVerification = async (data: { id: string; hash: string }): Promise<ApiResponse<any>> => {
+    try {
+      return await makeRequest(api.get(`/email/verify/${data.id}/${data.hash}`));
+    } catch (error: any) {
+      let apiError: ApiError;
+      if (error.status !== undefined) {
+        apiError = error;
+      } else {
+        apiError = { 
+          message: error.message || "Failed to verify email",
+          status: error.response?.status
+        };
+      }
+      
+      return {
+        success: false,
+        data: null,
+        error: apiError,
+        status: apiError.status
+      };
+    }
+  };
 
-   const resendVerificationEmail = async (data: { email: string }) => {
-     try {
-       const response = await axios.post(`${API_BASE_URL}/resend-verification-email`, data);
-       return response;
-     } catch (error) {
-       throw error;
-     }
-   };
+  const resendVerificationEmail = async (data: { email: string }): Promise<ApiResponse<any>> => {
+    try {
+      return await makeRequest(api.post('/email/verification-notification', data));
+    } catch (error: any) {
+      console.error("Resend verification email failed:", error);
+      if (error && typeof error.success === 'boolean') {
+        return error;
+      }
+      return {
+        success: false,
+        data: null,
+        error: { 
+          message: error?.message || "Failed to resend verification email",
+          status: error?.status
+        },
+        status: error?.status || 500
+      };
+    }
+  };
 
-  const value = { user, setUser, isLoading, login, logout, register, checkAuthStatus, checkEmailVerification, resendVerificationEmail };
+  const value = { 
+    user, 
+    setUser, 
+    isLoading, 
+    isVerified,
+    login, 
+    logout, 
+    register, 
+    checkAuthStatus, 
+    checkEmailVerification, 
+    resendVerificationEmail 
+  };
 
   return (
     <AuthContext.Provider value={value}>

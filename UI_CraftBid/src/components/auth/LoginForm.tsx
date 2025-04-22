@@ -4,12 +4,14 @@ import { Label } from "../ui/label"
 import PasswordInput from "../ui/passwordInput"
 import { useAuth } from "../../contexts/AuthContext"
 import { useNavigate, useLocation } from "react-router-dom"
+import { ValidationErrors } from "../../lib/axois" 
 
 export default function LoginForm() {
     const [email, setEmail] = useState("")
     const [password, setPassword] = useState("")
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState<string | null>(null)
+    const [fieldErrors, setFieldErrors] = useState<ValidationErrors | null>(null)
     
     const { login } = useAuth()
     const navigate = useNavigate()
@@ -18,24 +20,32 @@ export default function LoginForm() {
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
         setError(null)
+        setFieldErrors(null)
         setLoading(true)
         
-        try {
-            await login({ email, password })
-            // Get return URL from location state or default to home page
+        const response = await login({ email, password })
+        setLoading(false)
+        
+        if (response.success) {
             const from = (location.state as any)?.from?.pathname || '/'
-            navigate(from)
-        } catch (err: any) {
-            console.error('Login error:', err)
-            if (err.response?.data?.message) {
-                setError(err.response.data.message)
-            } else if (err.message) {
-                setError(err.message)
+            navigate(from, { replace: true })
+        } else if (response.verificationRequired) {
+            const userRole = 'buyer'
+            
+            navigate(`/status?role=${userRole}`, { 
+                replace: true, 
+                state: { email: email }
+            })
+        } else {
+            console.error('Login error response:', response)
+            const errorMessage = response.error?.message || 'Failed to login. Please check your credentials.'
+            
+            if (response.status === 422 && response.error?.errors) {
+                setFieldErrors(response.error.errors)
+                setError("Please correct the errors below.")
             } else {
-                setError('Failed to login. Please check your credentials.')
+                setError(errorMessage)
             }
-        } finally {
-            setLoading(false)
         }
     }
 
@@ -50,12 +60,14 @@ export default function LoginForm() {
                         type="email"
                         id="email"
                         placeholder="johndeo@example.com"
-                        className="px-3 py-3 border border-gray-300 rounded-md w-full focus:outline-none focus:ring-2 focus:ring-accent1 font-medium text-[16px]"
+                        className={`px-3 py-3 border rounded-md w-full focus:outline-none focus:ring-2 font-medium text-[16px] ${fieldErrors?.email ? 'border-red-500 focus:ring-red-300' : 'border-gray-300 focus:ring-accent1'}`}
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
                         required
                         disabled={loading}
+                        aria-invalid={fieldErrors?.email ? true : false}
                     />
+                    {fieldErrors?.email && <p className="text-red-500 text-xs mt-1">{fieldErrors.email[0]}</p>}
                 </div>
                 <div className="w-full mb-4">
                     <Label htmlFor="password" className="font-medium text-black text-[16px]">Password</Label>
@@ -68,6 +80,7 @@ export default function LoginForm() {
                         required
                         disabled={loading}
                     />
+                    {fieldErrors?.password && <p className="text-red-500 text-xs mt-1">{fieldErrors.password[0]}</p>}
                 </div>
 
                 <button 

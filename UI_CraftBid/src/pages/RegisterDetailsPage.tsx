@@ -36,14 +36,14 @@ const RegisterDetailsPage: React.FC = () => {
     }
 
     try {
-      const response = await register({
+      await register({
         name,
         email,
         password,
         password_confirmation: passwordConfirmation,
         role,
       });
-      const message = response.data.message || 'Registration successful! Please check your email to verify.';
+      const message = 'Registration successful! Please check your email for a verification link.';
       navigate('/register/success', { state: { message } });
     } catch (err: any) {
       console.error('Registration error:', err);
