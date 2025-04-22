@@ -32,29 +32,36 @@ const RegisterDetailsPage: React.FC = () => {
     if (password !== passwordConfirmation) {
       setError('Passwords do not match.');
       setLoading(false);
+      setLoading(false);
       return;
     }
 
-    try {
-      await register({
-        name,
-        email,
-        password,
-        password_confirmation: passwordConfirmation,
-        role,
-      });
+    // Call the register function from AuthContext
+    const response = await register({
+      name,
+      email,
+      password,
+      password_confirmation: passwordConfirmation,
+      role,
+    });
+
+    setLoading(false); // Stop loading regardless of outcome
+
+    if (response.success) {
+      // Registration successful (API returned success)
       const message = 'Registration successful! Please check your email for a verification link.';
       navigate('/register/success', { state: { message } });
-    } catch (err: any) {
-      console.error('Registration error:', err);
-      if (err.response?.data?.errors) {
-        const messages = Object.values(err.response.data.errors).flat().join(' ');
+    } else {
+      // Registration failed (API returned error)
+      console.error('Registration error:', response.error);
+      // Check if the error object contains validation errors
+      if (response.error?.errors) {
+        const messages = Object.values(response.error.errors).flat().join(' ');
         setError(messages || 'Validation failed.');
       } else {
-        setError(err.response?.data?.message || err.message || 'An unexpected error occurred.');
+        // Use the general error message
+        setError(response.error?.message || 'An unexpected error occurred during registration.');
       }
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -70,91 +77,91 @@ const RegisterDetailsPage: React.FC = () => {
           Have an account? <Link to="/login" className="text-accent1 underline">Sign In</Link>
         </p>
       </div>
-      
+
       <div className='flex flex-col items-center justify-center max-w-md mx-auto px-6'>
         <h1 className='text-black text-2xl font-bold mt-10 w-full text-center'>Sign up as {role === 'artisan' ? 'an' : 'a'} {role.charAt(0).toUpperCase() + role.slice(1)}</h1>
         <p className='text-gray-500 text-sm font-medium mt-1 mb-6 w-full text-center'>Please fill in your data</p>
-        
+
         {error && <div className="text-red-500 bg-red-100 p-3 rounded mb-4 text-sm w-full">{error}</div>}
-        
+
         <form onSubmit={handleSubmit} className='space-y-5 w-full'>
           <input type='hidden' value={role} name='role' />
-          
+
           <div>
             <label htmlFor='name' className='block text-sm font-medium text-gray-700 mb-1'>
               {role === 'artisan' ? 'Business name' : 'Name'}
             </label>
-            <input 
-              id='name' 
-              name='name' 
-              type='text' 
+            <input
+              id='name'
+              name='name'
+              type='text'
               placeholder={role === 'artisan' ? 'Your business name' : 'John Doe'}
-              required 
-              className='block w-full px-4 py-3 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-accent1 focus:border-accent1' 
-              value={name} 
-              onChange={e => setName(e.target.value)} 
-              disabled={loading} 
+              required
+              className='block w-full px-4 py-3 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-accent1 focus:border-accent1'
+              value={name}
+              onChange={e => setName(e.target.value)}
+              disabled={loading}
             />
           </div>
-          
+
           <div>
             <label htmlFor='email' className='block text-sm font-medium text-gray-700 mb-1'>Email</label>
-            <input 
-              id='email' 
-              name='email' 
-              type='email' 
+            <input
+              id='email'
+              name='email'
+              type='email'
               placeholder='johndeo@gmail.com'
-              autoComplete='email' 
-              required 
-              className='block w-full px-4 py-3 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-accent1 focus:border-accent1' 
-              value={email} 
-              onChange={e => setEmail(e.target.value)} 
-              disabled={loading} 
+              autoComplete='email'
+              required
+              className='block w-full px-4 py-3 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-accent1 focus:border-accent1'
+              value={email}
+              onChange={e => setEmail(e.target.value)}
+              disabled={loading}
             />
           </div>
-          
+
           <div>
             <label htmlFor='password' className='block text-sm font-medium text-gray-700 mb-1'>Password</label>
-            <input 
-              id='password' 
-              name='password' 
-              type='password' 
+            <input
+              id='password'
+              name='password'
+              type='password'
               placeholder='minimum 8 characters'
-              required 
-              className='block w-full px-4 py-3 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-accent1 focus:border-accent1' 
-              value={password} 
-              onChange={e => setPassword(e.target.value)} 
-              disabled={loading} 
+              required
+              className='block w-full px-4 py-3 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-accent1 focus:border-accent1'
+              value={password}
+              onChange={e => setPassword(e.target.value)}
+              disabled={loading}
             />
           </div>
-          
+
           <div>
             <label htmlFor='password_confirmation' className='block text-sm font-medium text-gray-700 mb-1'>Confirm Password</label>
-            <input 
-              id='password_confirmation' 
-              name='password_confirmation' 
-              type='password' 
+            <input
+              id='password_confirmation'
+              name='password_confirmation'
+              type='password'
               placeholder='retype your password'
-              required 
-              className='block w-full px-4 py-3 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-accent1 focus:border-accent1' 
-              value={passwordConfirmation} 
-              onChange={e => setPasswordConfirmation(e.target.value)} 
-              disabled={loading} 
+              required
+              className='block w-full px-4 py-3 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-accent1 focus:border-accent1'
+              value={passwordConfirmation}
+              onChange={e => setPasswordConfirmation(e.target.value)}
+              disabled={loading}
             />
           </div>
-          
+
           <div className="flex gap-4 items-center">
-            <button 
-              type="button" 
+            <button
+              type="button"
               onClick={() => navigate('/register')}
               className="px-4 bg-white border border-accent1 text-black py-3 rounded-md font-medium hover:bg-accent1/5 transition-colors w-1/3 flex items-center justify-center"
             >
               <ArrowLeft size={18} className="mr-1 text-black  " />
               Back
             </button>
-            <button 
-              type="submit" 
-              disabled={loading} 
+            <button
+              type="submit"
+              disabled={loading}
               className="flex-1 bg-accent1 text-white py-3 px-4 rounded-md font-medium flex items-center justify-center gap-2 hover:bg-accent1/90 transition-colors"
             >
               {loading ? 'Signing Up...' : 'Sign Up'}
@@ -162,7 +169,7 @@ const RegisterDetailsPage: React.FC = () => {
             </button>
           </div>
         </form>
-        
+
         <div className="relative my-6 w-full">
           <div className="absolute inset-0 flex items-center">
             <div className="w-full border-t border-gray-300"></div>
@@ -171,7 +178,7 @@ const RegisterDetailsPage: React.FC = () => {
             <span className="bg-white px-4 text-gray-500">Or sign up with</span>
           </div>
         </div>
-        
+
         <div className="grid grid-cols-2 gap-4 w-full">
           <button
             type="button"
