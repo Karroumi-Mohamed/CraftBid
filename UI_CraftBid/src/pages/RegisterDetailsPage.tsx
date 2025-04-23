@@ -63,8 +63,8 @@ const RegisterDetailsPage: React.FC = () => {
 
     if (response.success) {
       // Registration successful (API returned success)
-      const message = 'Registration successful! Please check your email for a verification link.';
-      navigate('/register/success', { state: { message } });
+      // Navigate to the status page, passing role and email
+      navigate('/status', { state: { role: role, email: email } });
     } else {
       // Registration failed (API returned error)
       console.error('Registration error:', response.error);

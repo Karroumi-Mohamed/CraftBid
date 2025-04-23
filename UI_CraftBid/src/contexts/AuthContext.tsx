@@ -43,12 +43,16 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             } else {
                 setUser(null);
                 setIsVerified(false);
-                const verificationRequired = response.status === 409;
-                if (!verificationRequired && response.status !== 401 && response.status !== 419) {
-                    console.error("Auth check failed:", response.error);
-                }
-                setIsLoading(false);
-                return { ...response, verificationRequired };
+         // Check if the error is specifically due to lack of verification (403 or 409)
+         // Laravel's default 'verified' middleware returns 403 if not verified
+         const verificationRequired = response.status === 403 || response.status === 409;
+         if (!verificationRequired && response.status !== 401 && response.status !== 419) {
+           // Log other unexpected errors during auth check
+           console.error("Auth check failed with unexpected status:", response.status, response.error);
+         }
+         setIsLoading(false);
+         // Return success: false, but indicate if verification is the specific reason
+         return { success: false, data: null, error: response.error, status: response.status, verificationRequired };
             }
         } catch (error) {
             setUser(null);

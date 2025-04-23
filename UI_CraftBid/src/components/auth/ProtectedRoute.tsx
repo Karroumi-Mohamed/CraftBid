@@ -7,7 +7,8 @@ interface ProtectedRouteProps {
 }
 
 const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
-  const { user, isLoading } = useAuth();
+  // Destructure isVerified from useAuth as well
+  const { user, isLoading, isVerified } = useAuth();
   const location = useLocation();
 
   if (isLoading) {
@@ -18,11 +19,21 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
   if (!user) {
     // User not logged in, redirect them to the /login page
     // Pass the current location state so we can redirect back after login
-    return <Navigate to="/login" state={{ from: location }} replace />;
-  }
+     return <Navigate to="/login" state={{ from: location }} replace />;
+   }
 
-  // User is logged in, render the child component (the protected page)
-  return <>{children}</>;
+   // User is logged in, BUT check if their email is verified
+   if (!isVerified) {
+     // User is logged in but not verified, redirect to the status page
+     // Pass relevant info like email if needed by the status page, though it should fetch its own
+     console.log("ProtectedRoute: User authenticated but not verified. Redirecting to /status.");
+     // Pass user's primary role if available in context
+     const role = user.roles?.[0]?.name;
+     return <Navigate to="/status" state={{ email: user.email, role: role }} replace />;
+   }
+
+   // User is logged in AND verified, render the child component
+   return <>{children}</>;
 };
 
 export default ProtectedRoute;
