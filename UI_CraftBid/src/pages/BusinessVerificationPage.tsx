@@ -1,287 +1,472 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate, useLocation, Link } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { ArrowRight, Mail, CheckCircle, XCircle, AlertCircle, UploadCloud, RefreshCw } from 'lucide-react'; // Added RefreshCw
+import { ArrowRight, Mail, UploadCloud, RefreshCw, ClipboardList } from 'lucide-react';
 import LogoutButton from '../components/auth/LogoutButton';
-import { Alert, AlertDescription, AlertTitle } from '../components/ui/alert';
+import { Alert, AlertDescription } from '../components/ui/alert';
 import { Button } from '../components/ui/button';
-import api, { makeRequest, ApiResponse } from '../lib/axois'; // Use the configured api instance
+import api, { makeRequest } from '../lib/axois';
 
-// Define status types based on API response and component logic
-type EmailVerificationStatus = 'pending' | 'verified';
-type IdVerificationStatus = 'not_required' | 'pending' | 'submitted' | 'verified' | 'rejected';
+type EmailVerificationStatus = 'not_started' | 'sent' | 'completed';
+type IdVerificationStatus = 'not_started' | 'pending' | 'confirmed' | 'rejected';
+type ProfileCompletionStatus = 'pending' | 'completed';
 
-// Interface for the API response from /user/verification-status
 interface VerificationStatusResponse {
     role: 'buyer' | 'artisan';
-    emailVerified: boolean;
-    idStatus: IdVerificationStatus | null; // Can be null if not an artisan
+    emailStatus: EmailVerificationStatus;
+    idStatus: IdVerificationStatus | null;
+    hasArtisanProfile: boolean | null;
 }
 
 const BusinessVerificationPage: React.FC = () => {
     const navigate = useNavigate();
-    const location = useLocation();
-    // Get user from AuthContext, but rely on API for definitive status
-    const { user, resendVerificationEmail, isLoading: authLoading, checkAuthStatus } = useAuth();
-    // Get role/email passed from registration/login if available
-    const stateRole = location.state?.role as 'buyer' | 'artisan' | null;
-    const stateEmail = location.state?.email as string | null;
+    const { user, isLoading: authLoading } = useAuth();
 
-    // State for displaying status
-    const [userRole, setUserRole] = useState<'buyer' | 'artisan' | null>(stateRole);
-    const [emailVerificationStatus, setEmailVerificationStatus] = useState<EmailVerificationStatus>('pending');
-    const [idVerificationStatus, setIdVerificationStatus] = useState<IdVerificationStatus>('not_required');
-    const [isLoading, setIsLoading] = useState(true); // Loading state for this page's API call
+    const [userRole, setUserRole] = useState<'buyer' | 'artisan' | 'admin' | null>(
+        user?.roles?.[0]?.name as 'buyer' | 'artisan' | 'admin' | null ?? null
+    );
+    const [emailVerificationStatus, setEmailVerificationStatus] = useState<EmailVerificationStatus>(
+        user?.email_verified_at ? 'completed' : 'not_started'
+    );
+    const [idVerificationStatus, setIdVerificationStatus] = useState<IdVerificationStatus>('not_started');
+    const [profileCompletionStatus, setProfileCompletionStatus] = useState<ProfileCompletionStatus>('pending');
+    const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [resendStatus, setResendStatus] = useState<'idle' | 'sending' | 'sent' | 'error'>('idle');
     const [resendError, setResendError] = useState<string | null>(null);
 
-    // Determine the email to display (prefer user context, fallback to state)
-    const displayEmail = user?.email || stateEmail || 'your email';
+    const displayEmail = user?.email || 'your email';
 
-    // Fetch verification status from the API when the component mounts or auth status changes
     useEffect(() => {
         const fetchVerificationStatus = async () => {
-             // We need to be authenticated to hit the status endpoint
-             // If initial auth check is still running, wait.
-             if (authLoading) return;
+            if (authLoading) return;
 
-             // If not authenticated after check, redirect to login
-             if (!user && !stateEmail) { // Check if we have neither logged-in user nor email from state
-                 navigate('/login', { state: { message: 'Please log in to check your status.' } });
-                 return;
-             }
+            if (!user) {
+                navigate('/login', { state: { message: 'Please log in.' } });
+                return;
+            }
+
+            const currentUserRole = user.roles?.[0]?.name as 'buyer' | 'artisan' | 'admin' | null;
+            setUserRole(currentUserRole);
+
+            if (currentUserRole === 'admin') {
+                if (user.email_verified_at) {
+                    navigate('/admin');
+                    setIsLoading(false);
+                    return;
+                } else {
+                    setEmailVerificationStatus('not_started');
+                    setProfileCompletionStatus('completed');
+                    setIdVerificationStatus('not_started');
+                    setIsLoading(false);
+                    return;
+                }
+            }
 
             setIsLoading(true);
             setError(null);
             try {
-                // Use the actual API endpoint
                 const response = await makeRequest<VerificationStatusResponse>(api.get('/user/verification-status'));
 
                 if (response.success && response.data) {
-                    const { role: apiRole, emailVerified, idStatus } = response.data;
-                    setUserRole(apiRole); // Update role based on API response
-                    setEmailVerificationStatus(emailVerified ? 'verified' : 'pending');
-                    // Set ID status based on API response, default to 'not_required' if null/buyer
-                    setIdVerificationStatus(idStatus ?? 'not_required');
+                    const { role: apiRole, emailStatus, idStatus, hasArtisanProfile } = response.data;
+
+                    setEmailVerificationStatus(emailStatus);
+
+                    if (apiRole === 'artisan') {
+                        setIdVerificationStatus(idStatus ?? 'not_started');
+                        setProfileCompletionStatus(hasArtisanProfile ? 'completed' : 'pending');
+                    } else {
+                        setIdVerificationStatus('not_started');
+                        setProfileCompletionStatus('completed');
+                    }
                 } else {
-                    // Handle errors, e.g., user not authenticated (401), server error (500)
                     setError(response.error?.message || 'Failed to fetch verification status.');
-                    // Set default states on error
-                    setEmailVerificationStatus('pending');
-                    // Try to determine role from context or state as fallback
-                    const currentRole = user?.roles?.[0]?.name || stateRole;
-                    setIdVerificationStatus(currentRole === 'artisan' ? 'pending' : 'not_required');
+                    setEmailVerificationStatus(user.email_verified_at ? 'completed' : 'not_started');
+                    setIdVerificationStatus('not_started');
+                    setProfileCompletionStatus(currentUserRole === 'artisan' ? 'pending' : 'completed');
 
                     if (response.status === 401) {
-                        // If unauthenticated, redirect to login
-                        navigate('/login', { state: { message: 'Session expired. Please log in again to check your status.' } });
+                        navigate('/login', { state: { message: 'Session expired. Please log in again.' } });
                     }
                 }
             } catch (err) {
-                 console.error("Unexpected error fetching status:", err);
-                 setError('An unexpected error occurred while fetching status.');
-                 setEmailVerificationStatus('pending');
-                 const currentRole = user?.roles?.[0]?.name || stateRole;
-                 setIdVerificationStatus(currentRole === 'artisan' ? 'pending' : 'not_required');
+                setError('An unexpected error occurred.');
+                setEmailVerificationStatus(user.email_verified_at ? 'completed' : 'not_started');
+                setIdVerificationStatus('not_started');
+                setProfileCompletionStatus(currentUserRole === 'artisan' ? 'pending' : 'completed');
             } finally {
                 setIsLoading(false);
             }
         };
 
-        // Only run fetchVerificationStatus when authLoading transitions from true to false,
-        // or if the user object itself changes (e.g., after email verification happens elsewhere)
         if (!authLoading) {
-             fetchVerificationStatus();
+            fetchVerificationStatus();
         }
-
-    }, [authLoading, user?.id, navigate]); // Depend on authLoading and user ID
+    }, [authLoading, user, navigate]);
 
     const handleResendEmail = async () => {
-        // Use the email determined by displayEmail
-        if (!displayEmail || displayEmail === 'your email') {
-            setResendError("Could not determine the email address to resend to.");
-            setResendStatus('error');
+        const emailToResend = user?.email;
+        if (!emailToResend) {
+            setResendError("Could not determine email.");
             return;
         }
         setResendStatus('sending');
         setResendError(null);
-        // Use the function from AuthContext, passing the correct email
-        const response = await resendVerificationEmail({ email: displayEmail });
+        const response = await makeRequest<{ message: string }>(api.post('/auth/resend-verification-email', { email: emailToResend }));
+
         if (response.success) {
             setResendStatus('sent');
+            setEmailVerificationStatus('sent');
         } else {
-            setResendError(response.error?.message || "Failed to resend email.");
+            setResendError(response.error?.message || "Failed to send email.");
             setResendStatus('error');
         }
     };
-
     const handleContinue = () => {
-        // Navigate to dashboard or appropriate next step
-        // Potentially check roles/status again before navigating if needed
-        navigate('/dashboard'); // Adjust '/dashboard' to your actual dashboard route
+        if (userRole === 'admin' && emailVerificationStatus === 'completed') {
+            navigate('/admin/dashboard');
+        } else {
+            navigate('/dashboard');
+        }
+    };
+    const handleCompleteProfile = () => {
+        navigate('/register/artisan-details', { state: { userId: user?.id } });
+    };
+    const handleUploadDocuments = () => {
+        navigate('/upload-id');
     };
 
-    // Determine if the user is an artisan based on the fetched role
     const isArtisan = userRole === 'artisan';
-    const isEmailVerified = emailVerificationStatus === 'verified';
-    const isIdVerified = idVerificationStatus === 'verified';
-    // const isIdRejected = idVerificationStatus === 'rejected'; // Keep for potential UI logic
-    // const isIdPendingReview = idVerificationStatus === 'submitted'; // Keep for potential UI logic
+    const isAdmin = userRole === 'admin';
+    const isEmailVerified = emailVerificationStatus === 'completed';
+    const isProfileComplete = profileCompletionStatus === 'completed';
+    const isIdVerified = idVerificationStatus === 'confirmed';
 
-    // Determine overall readiness to continue (Email must be verified, and ID must be verified if artisan)
-    const canContinue = isEmailVerified && (!isArtisan || isIdVerified);
+    const canContinue = isEmailVerified && (isAdmin || !isArtisan || (isProfileComplete && isIdVerified));
 
-    // --- UI Helper Functions --- (Keep these as they are)
-    const getStatusIcon = (status: EmailVerificationStatus | IdVerificationStatus) => {
-        switch (status) {
-            case 'verified': return <CheckCircle className="h-5 w-5 text-green-500" />;
-            case 'rejected': return <XCircle className="h-5 w-5 text-red-500" />;
-            case 'pending':
-            case 'submitted':
-            case 'not_required': // Treat as pending/neutral visually if shown
-            default: return <AlertCircle className="h-5 w-5 text-yellow-500" />;
+    const getStatusText = (section: 'email' | 'id' | 'profile', status: EmailVerificationStatus | IdVerificationStatus | ProfileCompletionStatus): string => {
+        if (section === 'email') {
+            switch (status) {
+                case 'sent':
+                    return 'Pending';
+                case 'completed':
+                    return 'Completed';
+                default:
+                    return '';
+            }
+        } else if (section === 'id') {
+            switch (status) {
+                case 'pending':
+                    return 'Pending';
+                case 'confirmed':
+                    return 'Completed';
+                case 'rejected':
+                    return 'Rejected';
+                default:
+                    return '';
+            }
+        } else if (section === 'profile') {
+            switch (status) {
+                case 'completed':
+                    return 'Completed';
+                default:
+                    return '';
+            }
         }
+        return '';
     };
 
-    const getStatusColorClass = (status: EmailVerificationStatus | IdVerificationStatus) => {
-        switch (status) {
-            case 'verified': return 'border-green-500/30 bg-green-500/5 text-green-700';
-            case 'rejected': return 'border-red-500/30 bg-red-500/5 text-red-700';
-            case 'pending':
-            case 'submitted':
-            case 'not_required':
-            default: return 'border-yellow-500/30 bg-yellow-500/5 text-yellow-700';
+    const getStatusDescription = (section: 'email' | 'id' | 'profile', status: EmailVerificationStatus | IdVerificationStatus | ProfileCompletionStatus): string => {
+        if (section === 'email') {
+            switch (status) {
+                case 'not_started':
+                    return 'Verify your email address to proceed.';
+                case 'sent':
+                    return `A verification link was sent to ${displayEmail}. Check your inbox/spam.`;
+                case 'completed':
+                    return 'Your email address has been verified.';
+                default:
+                    return 'Status description goes here.';
+            }
+        } else if (section === 'id') {
+            switch (status) {
+                case 'not_started':
+                    return 'Upload your ID document for verification.';
+                case 'pending':
+                    return 'Your ID is currently under review.';
+                case 'confirmed':
+                    return 'Your ID has been verified.';
+                case 'rejected':
+                    return 'Your ID verification failed. Please try again.';
+                default:
+                    return 'Status description goes here.';
+            }
+        } else if (section === 'profile') {
+            switch (status) {
+                case 'pending':
+                    return 'Please complete your artisan profile with your business details.';
+                case 'completed':
+                    return 'Your artisan profile details have been saved.';
+                default:
+                    return 'Status description goes here.';
+            }
         }
+        return 'Status description goes here.';
     };
 
-    const getStatusLabel = (status: EmailVerificationStatus | IdVerificationStatus): string => {
-        switch (status) {
-            case 'verified': return 'Verified';
-            case 'rejected': return 'Rejected';
-            case 'pending': return 'Pending Action';
-            case 'submitted': return 'Pending Review';
-            case 'not_required': return 'Not Required';
-            default: return 'Unknown';
-        }
-    };
-    // --- End UI Helper Functions ---
-
-    // Display loading indicator while fetching status or initial auth check is running
     if (authLoading || isLoading) {
-        return <div className="min-h-screen flex items-center justify-center">Loading verification status...</div>;
+        return <div className="min-h-screen flex items-center justify-center">Loading account status...</div>;
     }
 
     return (
-        <div className="min-h-screen bg-gray-50 flex flex-col w-full">
-            {/* Header */}
-            <div className='flex justify-between items-center p-4 w-full border-b bg-white'>
-                <Link to="/" className='pl-2'>
-                    {/* Ensure logo path is correct */}
-                    <img src="/logo.png" className="h-8" alt="CraftBid" />
+        <div className="min-h-screen bg-white flex flex-col w-full">
+            <div className="flex justify-between items-center p-5 w-full">
+                <Link to="/" className="pl-2">
+                    <img src="/logo.png" className="h-10" alt="CraftBid Logo" />
                 </Link>
-                {/* Show logout only if user context exists (implies logged in) */}
-                {user && <LogoutButton />}
+                <div className="flex items-center">
+                    {user && <LogoutButton />}
+                    {!user && (
+                        <Link to="/login">
+                            <Button variant="link" className="text-accent1">
+                                Sign In
+                            </Button>
+                        </Link>
+                    )}
+                </div>
             </div>
 
-            <div className="flex-1 flex flex-col items-center w-full py-8 px-4">
-                <div className="w-full max-w-lg bg-white p-6 md:p-8 rounded-lg shadow-md">
-                    <h1 className="text-2xl font-semibold text-center mb-2 text-gray-800">Account Status</h1>
-                    <p className="text-gray-600 text-center mb-6">
-                        {isArtisan
-                            ? "Verify your email and identity to start selling on CraftBid."
-                            : "Please verify your email to access all CraftBid features."
-                        }
-                    </p>
-
-                    {/* Display general API errors */}
+            <div className="flex-1 flex flex-col items-center justify-center w-full px-6">
+                <div className="w-full max-w-md mx-auto relative">
                     {error && (
-                        <Alert variant="destructive" className="mb-4">
-                            <AlertCircle className="h-4 w-4" />
-                            <AlertTitle>Error</AlertTitle>
+                        <Alert variant="destructive" className="mb-6">
                             <AlertDescription>{error}</AlertDescription>
                         </Alert>
                     )}
 
-                    {/* Email Verification Block */}
-                    <div className={`border rounded-md mb-4 p-4 ${getStatusColorClass(emailVerificationStatus)}`}>
-                        <div className="flex items-center justify-between mb-2">
-                            <div className="flex items-center gap-2">
-                                <Mail className="h-5 w-5" />
-                                <h3 className="font-semibold text-base">Email Verification</h3>
-                            </div>
-                            <div className="flex items-center gap-1 text-sm font-medium">
-                                {getStatusIcon(emailVerificationStatus)}
-                                <span>{getStatusLabel(emailVerificationStatus)}</span>
-                            </div>
-                        </div>
-                        <p className="text-sm text-gray-600 mb-3">
-                            {isEmailVerified
-                                ? `Your email (${displayEmail}) is verified.`
-                                : `A verification link has been sent to ${displayEmail}. Please check your inbox (and spam folder).`
-                            }
-                        </p>
-                        {/* Show resend button only if email is pending */}
-                        {!isEmailVerified && (
-                            <div className="flex items-center gap-3">
-                                <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={handleResendEmail}
-                                    disabled={resendStatus === 'sending' || resendStatus === 'sent'}
+                    <div className="space-y-4 mb-6">
+                        {(() => {
+                            const status = emailVerificationStatus;
+                            const stateSuffix = status === 'completed' ? 'verified' : status === 'sent' ? 'pending' : 'not_started';
+                            const statusText = getStatusText('email', status);
+                            const description = getStatusDescription('email', status);
+                            const isVerified = status === 'completed';
+
+                            return (
+                                <div
+                                    className={`
+                                    border rounded-lg p-5 flex items-start gap-4 w-full transition-colors duration-300 ease-in-out
+                                    ${stateSuffix === 'verified' ? 'bg-[#E0F2F1] border-[#4DB6AC]' : ''}
+                                    ${stateSuffix === 'pending' ? 'bg-[#F3E5F5] border-[#AB47BC]' : ''}
+                                    ${stateSuffix === 'not_started' ? 'bg-white border-[#DEE2E6]' : ''}
+                                `}
                                 >
-                                    {resendStatus === 'sending' ? <RefreshCw className="mr-2 h-4 w-4 animate-spin" /> : null}
-                                    {resendStatus === 'sending' ? 'Sending...' : resendStatus === 'sent' ? 'Sent!' : 'Resend Email'}
-                                </Button>
-                                {resendStatus === 'sent' && <span className="text-sm text-green-600">Verification email sent successfully.</span>}
-                                {resendStatus === 'error' && <span className="text-sm text-red-600">{resendError || 'Failed to resend.'}</span>}
-                            </div>
-                        )}
+                                    <div className="flex-shrink-0 pt-px">
+                                        <div
+                                            className={`
+                                            w-8 h-8 rounded-full flex justify-center items-center transition-colors duration-300 ease-in-out
+                                            ${stateSuffix === 'verified' ? 'bg-[#4DB6AC]' : ''}
+                                            ${stateSuffix === 'pending' ? 'bg-[#AB47BC]' : ''}
+                                            ${stateSuffix === 'not_started' ? 'bg-[#B0BEC5]' : ''}
+                                        `}
+                                        ></div>
+                                    </div>
+                                    <div className="flex-grow flex flex-col">
+                                        <h2 className="text-base font-medium mb-px text-[#212529] leading-snug">Email Verification</h2>
+                                        <p
+                                            className={`text-sm mb-1 leading-snug ${
+                                                stateSuffix === 'verified' ? 'text-[#00796B]' : 'text-[#6C757D]'
+                                            }`}
+                                        >
+                                            {description}
+                                        </p>
+                                        {statusText && (
+                                            <span
+                                                className={`text-sm font-medium block ${
+                                                    stateSuffix === 'verified' ? 'text-[#00796B]' : ''
+                                                } ${stateSuffix === 'pending' ? 'text-[#8E24AA]' : ''}`}
+                                            >
+                                                {statusText}
+                                            </span>
+                                        )}
+                                        {!isVerified && (
+                                            <div className="mt-2 flex items-center gap-3">
+                                                {(status === 'sent' || status === 'not_started') && (
+                                                    <Button
+                                                        variant="outline"
+                                                        size="sm"
+                                                        onClick={handleResendEmail}
+                                                        disabled={resendStatus === 'sending' || resendStatus === 'sent'}
+                                                        className="text-xs px-3 py-1.5 h-auto border-[#ced4da] hover:bg-[#f8f9fa] hover:border-[#adb5bd] text-[#212529]"
+                                                    >
+                                                        {resendStatus === 'sending' ? (
+                                                            <RefreshCw className="mr-1 h-3 w-3 animate-spin" />
+                                                        ) : null}
+                                                        {resendStatus === 'sending'
+                                                            ? 'Sending...'
+                                                            : resendStatus === 'sent'
+                                                            ? 'Sent!'
+                                                            : status === 'not_started'
+                                                            ? 'Send Email'
+                                                            : 'Resend Email'}
+                                                    </Button>
+                                                )}
+                                                {resendStatus === 'sent' && (
+                                                    <span className="text-sm text-green-600">Verification email sent.</span>
+                                                )}
+                                                {resendStatus === 'error' && (
+                                                    <span className="text-sm text-red-600">{resendError || 'Failed.'}</span>
+                                                )}
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            );
+                        })()}
+
+                        {isArtisan &&
+                            (() => {
+                                const status = profileCompletionStatus;
+                                const stateSuffix = status === 'completed' ? 'verified' : 'pending';
+                                const statusText = getStatusText('profile', status);
+                                const description = getStatusDescription('profile', status);
+                                const isComplete = status === 'completed';
+
+                                return (
+                                    <div
+                                        className={`
+                                    border rounded-lg p-5 flex items-start gap-4 w-full transition-colors duration-300 ease-in-out
+                                    ${stateSuffix === 'verified' ? 'bg-[#E0F2F1] border-[#4DB6AC]' : ''}
+                                    ${stateSuffix === 'pending' ? 'bg-[#F3E5F5] border-[#AB47BC]' : ''}
+                                `}
+                                    >
+                                        <div className="flex-shrink-0 pt-px">
+                                            <div
+                                                className={`
+                                            w-8 h-8 rounded-full flex justify-center items-center transition-colors duration-300 ease-in-out
+                                            ${stateSuffix === 'verified' ? 'bg-[#4DB6AC]' : ''}
+                                            ${stateSuffix === 'pending' ? 'bg-[#AB47BC]' : ''}
+                                        `}
+                                            ></div>
+                                        </div>
+                                        <div className="flex-grow flex flex-col">
+                                            <h2 className="text-base font-medium mb-px text-[#212529] leading-snug">Artisan Profile</h2>
+                                            <p
+                                                className={`text-sm mb-1 leading-snug ${
+                                                    stateSuffix === 'verified' ? 'text-[#00796B]' : 'text-[#6C757D]'
+                                                }`}
+                                            >
+                                                {description}
+                                            </p>
+                                            {statusText && (
+                                                <span
+                                                    className={`text-sm font-medium block ${
+                                                        stateSuffix === 'verified' ? 'text-[#00796B]' : ''
+                                                    } ${stateSuffix === 'pending' ? 'text-[#8E24AA]' : ''}`}
+                                                >
+                                                    {statusText}
+                                                </span>
+                                            )}
+                                            {!isComplete && (
+                                                <div className="mt-2">
+                                                    <Button
+                                                        variant="outline"
+                                                        size="sm"
+                                                        onClick={handleCompleteProfile}
+                                                        className="text-xs px-3 py-1.5 h-auto border-[#ced4da] hover:bg-[#f8f9fa] hover:border-[#adb5bd] text-[#212529]"
+                                                    >
+                                                        Complete Profile
+                                                    </Button>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                );
+                            })()}
+
+                        {isArtisan &&
+                            isProfileComplete &&
+                            (() => {
+                                const status = idVerificationStatus;
+                                const stateSuffix = status === 'confirmed' ? 'verified' : status;
+                                const statusText = getStatusText('id', status);
+                                const description = getStatusDescription('id', status);
+                                const needsAction = status === 'not_started' || status === 'rejected';
+
+                                return (
+                                    <div
+                                        className={`
+                                    border rounded-lg p-5 flex items-start gap-4 w-full transition-colors duration-300 ease-in-out
+                                    ${stateSuffix === 'verified' ? 'bg-[#E0F2F1] border-[#4DB6AC]' : ''}
+                                    ${stateSuffix === 'pending' ? 'bg-[#F3E5F5] border-[#AB47BC]' : ''}
+                                    ${stateSuffix === 'rejected' ? 'bg-[#FFEBEE] border-[#EF5350]' : ''}
+                                    ${stateSuffix === 'not_started' ? 'bg-white border-[#DEE2E6]' : ''}
+                                `}
+                                    >
+                                        <div className="flex-shrink-0 pt-px">
+                                            <div
+                                                className={`
+                                            w-8 h-8 rounded-full flex justify-center items-center transition-colors duration-300 ease-in-out
+                                            ${stateSuffix === 'verified' ? 'bg-[#4DB6AC]' : ''}
+                                            ${stateSuffix === 'pending' ? 'bg-[#AB47BC]' : ''}
+                                            ${stateSuffix === 'rejected' ? 'bg-[#EF5350]' : ''}
+                                            ${stateSuffix === 'not_started' ? 'bg-[#B0BEC5]' : ''}
+                                        `}
+                                            ></div>
+                                        </div>
+                                        <div className="flex-grow flex flex-col">
+                                            <h2 className="text-base font-medium mb-px text-[#212529] leading-snug">ID Verification</h2>
+                                            <p
+                                                className={`text-sm mb-1 leading-snug ${
+                                                    stateSuffix === 'verified'
+                                                        ? 'text-[#00796B]'
+                                                        : stateSuffix === 'rejected'
+                                                        ? 'text-[#D32F2F]'
+                                                        : 'text-[#6C757D]'
+                                                }`}
+                                            >
+                                                {description}
+                                            </p>
+                                            {statusText && (
+                                                <span
+                                                    className={`text-sm font-medium block ${
+                                                        stateSuffix === 'verified' ? 'text-[#00796B]' : ''
+                                                    } ${stateSuffix === 'pending' ? 'text-[#8E24AA]' : ''} ${
+                                                        stateSuffix === 'rejected' ? 'text-[#D32F2F]' : ''
+                                                    }`}
+                                                >
+                                                    {statusText}
+                                                </span>
+                                            )}
+                                            {needsAction && (
+                                                <div className="mt-2">
+                                                    <Button
+                                                        variant="outline"
+                                                        size="sm"
+                                                        onClick={handleUploadDocuments}
+                                                        className="text-xs px-3 py-1.5 h-auto border-[#ced4da] hover:bg-[#f8f9fa] hover:border-[#adb5bd] text-[#212529]"
+                                                    >
+                                                        {status === 'rejected' ? 'Re-upload ID' : 'Upload ID'}
+                                                    </Button>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                );
+                            })()}
                     </div>
 
-                    {/* ID Verification Block (Artisans Only) */}
-                    {isArtisan && (
-                        <div className={`border rounded-md mb-4 p-4 ${getStatusColorClass(idVerificationStatus)}`}>
-                            <div className="flex items-center justify-between mb-2">
-                                <div className="flex items-center gap-2">
-                                    <UploadCloud className="h-5 w-5" />
-                                    <h3 className="font-semibold text-base">Identity Verification</h3>
-                                </div>
-                                <div className="flex items-center gap-1 text-sm font-medium">
-                                    {getStatusIcon(idVerificationStatus)}
-                                    <span>{getStatusLabel(idVerificationStatus)}</span>
-                                </div>
-                            </div>
-                            <p className="text-sm text-gray-600 mb-3">
-                                {idVerificationStatus === 'pending' && "Please upload your identification documents to verify your business."}
-                                {idVerificationStatus === 'submitted' && "Your documents have been submitted and are under review (usually takes 1-2 business days)."}
-                                {idVerificationStatus === 'verified' && "Your identity has been successfully verified."}
-                                {idVerificationStatus === 'rejected' && "Your ID verification was rejected. Please check your email or contact support for details."}
-                                {idVerificationStatus === 'not_required' && "ID Verification is not required for your account type."}
-                            </p>
-                            {/* Show upload button only if status is pending or rejected */}
-                            {(idVerificationStatus === 'pending' || idVerificationStatus === 'rejected') && (
-                                <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => navigate('/upload-id')} // TODO: Create this route/page
-                                >
-                                    {idVerificationStatus === 'rejected' ? 'Re-upload Documents' : 'Upload Documents'}
-                                </Button>
-                            )}
-                        </div>
-                    )}
-
-                    {/* Continue Button: Enabled only when all required verifications are complete */}
-                    <Button
-                        onClick={handleContinue}
-                        disabled={!canContinue}
-                        className="mt-6 w-full"
-                        size="lg"
-                    >
-                        {canContinue ? 'Continue to Dashboard' : 'Verification Pending'}
-                        {canContinue && <ArrowRight size={18} className="ml-2" />}
-                    </Button>
+                    <div className="mt-8 mb-4 w-full">
+                        <Button
+                            onClick={handleContinue}
+                            disabled={!canContinue}
+                            className="w-full bg-accent1 text-white py-3 px-4 rounded-md font-medium flex items-center justify-center gap-2 hover:bg-accent1/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                            Continue to Dashboard
+                            <ArrowRight size={20} />
+                        </Button>
+                    </div>
                 </div>
             </div>
         </div>
