@@ -12,11 +12,6 @@ class Artisan extends Model
 {
     use HasFactory, SoftDeletes;
 
-    /**
-     * The attributes that are mass assignable.
-     *
-     * @var array<int, string>
-     */
     protected $fillable = [
         'user_id',
         'business_name',
@@ -29,54 +24,36 @@ class Artisan extends Model
         'status',
         'id_verification_status',
         'id_verified_at',
+        'id_document_front_path',
+        'id_document_back_path',
     ];
 
-    /**
-     * The attributes that should be cast.
-     *
-     * @var array<string, string>
-     */
     protected $casts = [
         'social_media_links' => 'array',
         'id_verified_at' => 'datetime',
-        'rating' => 'decimal:1', // Cast rating to decimal
+        'rating' => 'decimal:1',
     ];
 
-    /**
-     * Get the user that owns the artisan profile.
-     */
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
     }
 
-    /**
-     * Get the products for the artisan.
-     */
     public function products(): HasMany
     {
         return $this->hasMany(Product::class);
     }
 
-    /**
-     * Get the auctions for the artisan.
-     */
     public function auctions(): HasMany
     {
         return $this->hasMany(Auction::class);
     }
 
-    /**
-     * Get the images for the artisan profile.
-     */
     public function images(): HasMany
     {
         return $this->hasMany(ArtisanImage::class);
     }
 
-    /**
-     * Get the comments for the artisan profile.
-     */
     public function comments(): HasMany
     {
         return $this->hasMany(ArtisanProfileComment::class);

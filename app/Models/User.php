@@ -87,8 +87,9 @@ class User extends Authenticatable implements MustVerifyEmail
     public function assignRole(string $roleName): void
     {
         $role = Role::where('name', $roleName)->first();
-        if ($role) {
-            $this->roles()->attach($role);
+        if (!$role) {
+            throw new \Exception("Role '{$roleName}' not found.");
         }
+        $this->roles()->attach($role);
     }
 }
