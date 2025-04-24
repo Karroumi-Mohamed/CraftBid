@@ -11,6 +11,8 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Auth\Events\Registered;
 use Illuminate\Auth\Events\Verified;
 use Illuminate\Validation\ValidationException;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 class AuthController extends Controller
 {
@@ -24,15 +26,22 @@ class AuthController extends Controller
                 'password' => 'required|string|min:8|confirmed',
             ]);
 
-            $user = User::create([
-                'name' => $fields['name'],
-                'email' => $fields['email'],
-                'password' => Hash::make($fields['password']),
-            ]);
+            $user = DB::transaction(function () use ($fields, $request) {
+                $newUser = User::create([
+                    'name' => $fields['name'],
+                    'email' => $fields['email'],
+                    'password' => Hash::make($fields['password']),
+                ]);
 
-            $user->assignRole($fields['role']);
+                $newUser->assignRole($fields['role']);
 
-            event(new Registered($user));
+                Auth::login($newUser);
+                $request->session()->regenerate();
+
+                return $newUser;
+            });
+
+            $user->load('roles');
 
             return response()->json([
                 'message' => 'Registration successful. Please check your email for a verification link.',
@@ -123,6 +132,10 @@ class AuthController extends Controller
 
         $request->user()->sendEmailVerificationNotification();
 
+        $request->user()->forceFill([
+            'verification_email_sent_at' => now()
+        ])->save();
+
         return response()->json([
             'message' => 'Verification link sent'
         ], 200);
@@ -130,24 +143,45 @@ class AuthController extends Controller
 
     public function getVerificationStatus(Request $request)
     {
-        $user = $request->user()->load('roles', 'artisan');
+        $user = $request->user();
+        if ($user) {
+            $user->refresh();
+            $user->load('roles', 'artisan');
+        }
 
         if (!$user) {
             return response()->json(['message' => 'Unauthenticated.'], 401);
         }
 
         $role = $user->roles->first()?->name ?? 'buyer';
-        $emailVerified = $user->hasVerifiedEmail();
-        $idStatus = null;
 
-        if ($role === 'artisan' && $user->artisan) {
-            $idStatus = $user->artisan->verification_status ?? 'pending';
+        $emailStatus = 'not_started';
+        if ($user->hasVerifiedEmail()) {
+            $emailStatus = 'completed';
+        } elseif ($user->verification_email_sent_at) {
+            $emailStatus = 'sent';
         }
+
+        $idStatus = null;
+        if ($role === 'artisan' && $user->artisan) {
+            $idStatus = $user->artisan->id_verification_status ?? 'not_started';
+        }
+
+        $hasArtisanProfile = $role === 'artisan' ? !is_null($user->artisan) : null;
+
+        Log::info("GetVerificationStatus Check:", [
+            'user_id' => $user->id,
+            'role' => $role,
+            'email_status' => $emailStatus,
+            'has_artisan_profile' => $hasArtisanProfile,
+            'fetched_id_status' => $idStatus
+        ]);
 
         return response()->json([
             'role' => $role,
-            'emailVerified' => $emailVerified,
+            'emailStatus' => $emailStatus,
             'idStatus' => $idStatus,
+            'hasArtisanProfile' => $hasArtisanProfile,
         ]);
     }
 }
