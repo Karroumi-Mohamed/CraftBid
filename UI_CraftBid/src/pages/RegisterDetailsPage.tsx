@@ -2,19 +2,16 @@ import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { ArrowRight, ArrowLeft } from "lucide-react";
-import { InputWithError } from '@/components/ui/InputWithError'; // Import the new component
-import { ValidationErrors } from '@/lib/axois'; // Import ValidationErrors type
+import { InputWithError } from '@/components/ui/InputWithError';
+import { ValidationErrors } from '@/lib/axois';
 
-// Define a type for the error state object
-// Make all expected fields optional strings (we'll take the first error message)
 interface RegistrationErrors {
   name?: string;
   email?: string;
   password?: string;
   password_confirmation?: string;
-  general?: string; // For non-field specific errors or general messages
+  general?: string;
 }
-
 
 const RegisterDetailsPage: React.FC = () => {
   const location = useLocation();
@@ -33,24 +30,21 @@ const RegisterDetailsPage: React.FC = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [passwordConfirmation, setPasswordConfirmation] = useState('');
-  // Use the new RegistrationErrors type for state
   const [errors, setErrors] = useState<RegistrationErrors>({});
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!role) return;
-    setErrors({}); // Clear previous errors
+    setErrors({});
     setLoading(true);
 
     if (password !== passwordConfirmation) {
-      // Set specific error for password confirmation
       setErrors(prev => ({ ...prev, password_confirmation: 'Passwords do not match.' }));
-      setLoading(false); // Stop loading if passwords don't match
+      setLoading(false);
       return;
     }
 
-    // Call the register function from AuthContext
     const response = await register({
       name,
       email,
@@ -59,33 +53,29 @@ const RegisterDetailsPage: React.FC = () => {
       role,
     });
 
-    setLoading(false); // Stop loading regardless of outcome
+    setLoading(false);
 
     if (response.success) {
-      // Registration successful (API returned success)
-      // Navigate to the status page, passing role and email
-      navigate('/status', { state: { role: role, email: email } });
-    } else {
-      // Registration failed (API returned error)
-      console.error('Registration error:', response.error);
-      // Check if the error object contains validation errors (ValidationErrors type)
-      if (response.error?.errors) {
-         const apiErrors = response.error.errors as ValidationErrors;
-         const newErrors: RegistrationErrors = {};
-         for (const field in apiErrors) {
-           if (apiErrors[field] && apiErrors[field].length > 0) {
-             // Take the first error message for each field
-             newErrors[field as keyof RegistrationErrors] = apiErrors[field][0];
-           }
-         }
-         // Handle password confirmation specifically if backend uses 'password' key for confirmation rule
-         if (newErrors.password && newErrors.password.toLowerCase().includes('confirmation')) {
-            newErrors.password_confirmation = newErrors.password;
-            delete newErrors.password; // Avoid showing confirmation error under main password field
-         }
-         setErrors(newErrors);
+      if (role === 'artisan') {
+        navigate('/register/artisan-details', { state: { email: email, userId: response.data?.id } });
       } else {
-        // Use the general error message and assign it to the 'general' key
+        navigate('/status', { state: { role: role, email: email } });
+      }
+    } else {
+      if (response.error?.errors) {
+        const apiErrors = response.error.errors as ValidationErrors;
+        const newErrors: RegistrationErrors = {};
+        for (const field in apiErrors) {
+          if (apiErrors[field] && apiErrors[field].length > 0) {
+            newErrors[field as keyof RegistrationErrors] = apiErrors[field][0];
+          }
+        }
+        if (newErrors.password && newErrors.password.toLowerCase().includes('confirmation')) {
+          newErrors.password_confirmation = newErrors.password;
+          delete newErrors.password;
+        }
+        setErrors(newErrors);
+      } else {
         setErrors({ general: response.error?.message || 'An unexpected error occurred during registration.' });
       }
     }
@@ -108,13 +98,11 @@ const RegisterDetailsPage: React.FC = () => {
         <h1 className='text-black text-2xl font-bold mt-10 w-full text-center'>Sign up as {role === 'artisan' ? 'an' : 'a'} {role.charAt(0).toUpperCase() + role.slice(1)}</h1>
         <p className='text-gray-500 text-sm font-medium mt-1 mb-6 w-full text-center'>Please fill in your data</p>
 
-        {/* Display general errors */}
         {errors.general && <div className="text-red-500 bg-red-100 p-3 rounded mb-4 text-sm w-full">{errors.general}</div>}
 
         <form onSubmit={handleSubmit} className='space-y-5 w-full'>
           <input type='hidden' value={role} name='role' />
 
-          {/* Use InputWithError component */}
           <InputWithError
             id='name'
             name='name'
@@ -125,7 +113,7 @@ const RegisterDetailsPage: React.FC = () => {
             value={name}
             onChange={e => setName(e.target.value)}
             disabled={loading}
-            error={errors.name} // Pass the specific error for this field
+            error={errors.name}
           />
 
           <InputWithError
@@ -139,7 +127,7 @@ const RegisterDetailsPage: React.FC = () => {
             value={email}
             onChange={e => setEmail(e.target.value)}
             disabled={loading}
-            error={errors.email} // Pass the specific error for this field
+            error={errors.email}
           />
 
           <InputWithError
@@ -152,7 +140,7 @@ const RegisterDetailsPage: React.FC = () => {
             value={password}
             onChange={e => setPassword(e.target.value)}
             disabled={loading}
-            error={errors.password} // Pass the specific error for this field
+            error={errors.password}
           />
 
           <InputWithError
@@ -165,7 +153,7 @@ const RegisterDetailsPage: React.FC = () => {
             value={passwordConfirmation}
             onChange={e => setPasswordConfirmation(e.target.value)}
             disabled={loading}
-            error={errors.password_confirmation} // Pass the specific error for this field
+            error={errors.password_confirmation}
           />
 
           <div className="flex gap-4 items-center">
@@ -174,7 +162,7 @@ const RegisterDetailsPage: React.FC = () => {
               onClick={() => navigate('/register')}
               className="px-4 bg-white border border-accent1 text-black py-3 rounded-md font-medium hover:bg-accent1/5 transition-colors w-1/3 flex items-center justify-center"
             >
-              <ArrowLeft size={18} className="mr-1 text-black  " />
+              <ArrowLeft size={18} className="mr-1 text-black" />
               Back
             </button>
             <button
