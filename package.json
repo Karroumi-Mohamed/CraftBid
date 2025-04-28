@@ -8,5 +8,8 @@
   "devDependencies": {
     "laravel-echo": "^2.0.2",
     "pusher-js": "^8.4.0"
+  },
+  "dependencies": {
+    "vite": "^6.3.3"
   }
 }
