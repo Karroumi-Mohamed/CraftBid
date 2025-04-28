@@ -11,11 +11,6 @@ class Bid extends Model
 {
     use HasFactory, SoftDeletes;
 
-    /**
-     * The attributes that are mass assignable.
-     *
-     * @var array<int, string>
-     */
     protected $fillable = [
         'auction_id',
         'user_id',
@@ -24,27 +19,16 @@ class Bid extends Model
         'ip_address',
     ];
 
-    /**
-     * The attributes that should be cast.
-     *
-     * @var array<string, string>
-     */
     protected $casts = [
         'amount' => 'decimal:2',
         'is_winning' => 'boolean',
     ];
 
-    /**
-     * Get the auction that the bid belongs to.
-     */
     public function auction(): BelongsTo
     {
         return $this->belongsTo(Auction::class);
     }
 
-    /**
-     * Get the user who placed the bid.
-     */
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
