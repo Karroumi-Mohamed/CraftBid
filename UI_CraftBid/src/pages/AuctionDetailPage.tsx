@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Loader2 } from "lucide-react";
 import { formatDistanceToNow, format } from 'date-fns';
+import echo from '@/lib/echo';
 
 interface Auction {
   id: number;
@@ -79,10 +80,12 @@ const AuctionDetailPage: React.FC = () => {
     }
   };
 
+
+
   const fetchBids = async () => {
     try {
       const response = await makeRequest(api.get(`/auctions/${id}/bids`));
-      
+
       if (response.success) {
         setBids(response.data.data);
       }
@@ -95,6 +98,20 @@ const AuctionDetailPage: React.FC = () => {
     fetchAuction();
     fetchBids();
   }, [id]);
+
+    useEffect(() => {
+        if (!auction) return;
+        console.log('Fetching auction bids from auction.', auction?.id);
+        const channel = echo.channel(`auction.${auction.id}`);
+        channel
+            .listen('.bid.placed', (e: any) => {
+                console.log('Bid placed:', e);
+            })
+        return () => {
+            channel.stopListening('.bid.placed');
+        }
+    }, [auction]);
+
 
   const handleBidSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

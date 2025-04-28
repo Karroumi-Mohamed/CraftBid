@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Events\BidPlaced;
 use App\Http\Controllers\Controller;
 use App\Models\Auction;
 use App\Models\Bid;
@@ -75,6 +76,8 @@ class BidController extends Controller
             }
 
             DB::commit();
+
+            event(new BidPlaced($bid, $auction));
 
             return response()->json([
                 'message' => 'Bid placed successfully',
