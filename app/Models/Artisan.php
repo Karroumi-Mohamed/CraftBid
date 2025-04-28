@@ -34,27 +34,27 @@ class Artisan extends Model
         'rating' => 'decimal:1',
     ];
 
-    public function user(): BelongsTo
+    public function user()
     {
         return $this->belongsTo(User::class);
     }
 
-    public function products(): HasMany
+    public function products()
     {
         return $this->hasMany(Product::class);
     }
 
-    public function auctions(): HasMany
+    public function auctions()
     {
         return $this->hasMany(Auction::class);
     }
 
-    public function images(): HasMany
+    public function images()
     {
         return $this->hasMany(ArtisanImage::class);
     }
-
-    public function comments(): HasMany
+    
+    public function comments()
     {
         return $this->hasMany(ArtisanProfileComment::class);
     }
