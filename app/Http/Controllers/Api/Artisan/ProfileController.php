@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Validator;
 
 class ProfileController extends Controller
 {
@@ -145,5 +146,86 @@ class ProfileController extends Controller
         }
 
         return response()->json($artisanProfile);
+    }
+
+    public function update(Request $request)
+    {
+        try {
+            $user = $request->user();
+
+            if (!$user || !$user->hasRole('artisan')) {
+                return response()->json(['message' => 'Unauthorized.'], 403);
+            }
+
+            $artisan = $user->artisan;
+
+            if (!$artisan) {
+                return response()->json(['message' => 'Artisan profile not found.'], 404);
+            }
+
+            $validator = Validator::make($request->all(), [
+                'business_name' => ['sometimes', 'required', 'string', 'max:255'],
+                'speciality' => ['sometimes', 'required', 'string', 'max:255'],
+                'location' => ['sometimes', 'required', 'string', 'max:255'],
+                'bio' => ['sometimes', 'required', 'string'],
+                'image' => ['nullable', 'image', 'mimes:jpeg,png,jpg', 'max:2048'],
+            ]);
+
+            if ($validator->fails()) {
+                return response()->json([
+                    'message' => 'Validation failed.',
+                    'errors' => $validator->errors()
+                ], 422);
+            }
+
+            $dataToUpdate = [];
+
+            foreach (['business_name', 'speciality', 'location', 'bio'] as $field) {
+                if ($request->has($field)) {
+                    $dataToUpdate[$field] = $request->input($field);
+                }
+            }
+
+            if ($request->hasFile('image')) {
+                if ($artisan->image) {
+                    Storage::disk('public')->delete($artisan->image);
+                }
+
+                $imagePath = $request->file('image')->store('artisan_logos', 'public');
+                $dataToUpdate['image'] = $imagePath;
+            }
+
+            $artisan->update($dataToUpdate);
+
+            $artisan = $artisan->fresh();
+
+            if ($artisan->image) {
+                $artisan->image_url = Storage::disk('public')->url($artisan->image);
+            }
+
+            if ($artisan->id_document_front_path) {
+                $artisan->id_document_front_url = Storage::disk('public')->url($artisan->id_document_front_path);
+            }
+
+            if ($artisan->id_document_back_path) {
+                $artisan->id_document_back_url = Storage::disk('public')->url($artisan->id_document_back_path);
+            }
+
+            $artisan->load('user:id,name,email');
+
+            return response()->json($artisan);
+
+        } catch (ValidationException $e) {
+            return response()->json([
+                'message' => 'Validation failed.',
+                'errors' => $e->errors()
+            ], 422);
+        } catch (\Exception $e) {
+            Log::error('Failed to update artisan profile: ' . $e->getMessage());
+            return response()->json([
+                'message' => 'Failed to update profile.',
+                'error' => $e->getMessage()
+            ], 500);
+        }
     }
 }
