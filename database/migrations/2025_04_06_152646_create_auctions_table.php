@@ -15,18 +15,19 @@ return new class extends Migration
             $table->id();
             $table->foreignId('artisan_id')->constrained()->cascadeOnDelete();
             $table->foreignId('product_id')->constrained()->cascadeOnDelete();
-            $table->decimal('reserve_price', 10, 2)->default(10.00); // Minimum price to sell
-            $table->decimal('price', 10, 2)->nullable(); // Current highest bid amount
+            $table->decimal('reserve_price', 10, 2)->default(10.00);
+            $table->decimal('price', 10, 2)->nullable();
             $table->decimal('bid_increment', 10, 2)->default(1.00);
             $table->integer('bid_count')->default(0);
-            $table->boolean('anti_sniping')->default(true); // Extend end time if bid placed near end
+            $table->integer('quantity')->default(1);
+            $table->boolean('anti_sniping')->default(true);
             $table->dateTime('start_date');
             $table->dateTime('end_date');
             $table->enum('status', ['pending', 'active', 'ended', 'cancelled'])->default('pending');
-            $table->foreignId('winner_id')->nullable()->constrained('users')->nullOnDelete(); // Use nullOnDelete if user deleted
+            $table->foreignId('winner_id')->nullable()->constrained('users')->nullOnDelete();
             $table->enum('type', ['standard', 'featured'])->default('standard');
             $table->boolean('is_visible')->default(true);
-            $table->json('properties')->nullable(); // For extra details if needed
+            $table->json('properties')->nullable();
             $table->softDeletes();
             $table->timestamps();
 

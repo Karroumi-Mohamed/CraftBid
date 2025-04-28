@@ -18,9 +18,7 @@ return new class extends Migration
             $table->text('description')->nullable();
             $table->foreignId('category_id')->nullable()->constrained('categories')->nullOnDelete();
             $table->foreignId('artisan_id')->constrained('artisans')->cascadeOnDelete();
-            $table->integer('quantity')->default(1); // Assuming quantity for auction items is usually 1
-            $table->enum('status', ['active', 'inactive'])->default('active');
-            $table->boolean('featured')->default(false);
+            $table->enum('status', ['active', 'inactive', 'suspended'])->default('active');
             $table->softDeletes();
             $table->timestamps();
         });
