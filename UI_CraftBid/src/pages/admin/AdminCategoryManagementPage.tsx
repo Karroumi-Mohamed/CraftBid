@@ -79,7 +79,7 @@ const CategoryForm: React.FC<CategoryFormProps> = ({ initialData, allCategories,
     const [flatCategoryList, setFlatCategoryList] = useState<Category[]>([]);
     useEffect(() => {
         const fetchFlatList = async () => {
-            const response = await makeRequest<Category[]>(api.get('/admin/categories?flat=true'));
+            const response = await makeRequest<Category[]>(api.get('/categories?flat=true'));
             if (response.success && response.data) {
                 setFlatCategoryList(response.data);
             } else {
@@ -135,7 +135,7 @@ const AdminCategoryManagementPage: React.FC = () => {
     const fetchCategories = async () => {
         setIsLoading(true);
         setError(null);
-        const response = await makeRequest<Category[]>(api.get('/admin/categories'));
+        const response = await makeRequest<Category[]>(api.get('/categories'));
         if (response.success && response.data) {
             setCategories(response.data);
         } else {
