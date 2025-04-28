@@ -2,17 +2,14 @@ import React from 'react';
 import { Link, Outlet } from 'react-router-dom';
 import LogoutButton from '../auth/LogoutButton';
 import { useAuth } from '@/contexts/AuthContext';
-import { LayoutDashboard, Users, Shapes, Settings, ShieldCheck } from 'lucide-react'; // Import icons
+import { LayoutDashboard, Users, Shapes, Settings, ShieldCheck, Gavel } from 'lucide-react';
 
-// Sidebar specifically for Admin
 const AdminSidebar: React.FC = () => {
   const { user } = useAuth();
 
-  // Basic check if user exists and has admin role (can be enhanced)
   const isAdmin = user?.roles?.some(role => role.name === 'admin');
 
   if (!isAdmin) {
-    // Optionally render nothing or a restricted view if somehow accessed by non-admin
     return null;
   }
 
@@ -38,7 +35,12 @@ const AdminSidebar: React.FC = () => {
         <Link to="/admin/artisans" className="flex items-center gap-3 px-3 py-2 rounded hover:bg-gray-700 hover:text-white transition-colors">
             <ShieldCheck size={18} /> Artisan Verification
         </Link>
-        {/* Add links for Products, Auctions, Orders, Bids management later */}
+        <Link to="/admin/products" className="flex items-center gap-3 px-3 py-2 rounded hover:bg-gray-700 hover:text-white transition-colors">
+            <Shapes size={18} /> Product Management
+        </Link>
+        <Link to="/admin/auctions" className="flex items-center gap-3 px-3 py-2 rounded hover:bg-gray-700 hover:text-white transition-colors">
+            <Gavel size={18} /> Auction Management
+        </Link>
 
         <p className="text-xs uppercase text-gray-500 font-semibold pt-4 mb-2 px-3">System</p>
          <Link to="/admin/settings" className="flex items-center gap-3 px-3 py-2 rounded hover:bg-gray-700 hover:text-white transition-colors">
@@ -63,7 +65,6 @@ const AdminLayout: React.FC = () => {
     return <div className="flex items-center justify-center min-h-screen">Loading admin area...</div>;
   }
 
-  // Basic check, main protection should be via AdminRoute
   if (!user || !user.roles?.some(role => role.name === 'admin')) {
      return <div className="flex items-center justify-center min-h-screen">Access Denied. Requires Admin privileges.</div>;
   }
