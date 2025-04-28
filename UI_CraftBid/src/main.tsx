@@ -113,9 +113,7 @@ const router = createBrowserRouter([
       { path: "watchlist", element: <WatchlistPage /> },
       { path: "wallet", element: <WalletPage /> },
       { path: "settings", element: <SettingsPage /> },
-      {
-        path: "/profile", element: <ArtisanProfilePage />
-      }
+      { path: "profile", element: <ArtisanProfilePage /> }
     ]
   },
   {
