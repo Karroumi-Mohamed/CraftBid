@@ -1,4 +1,10 @@
 {
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "vite build",
+    "dev": "vite"
+  },
   "devDependencies": {
     "laravel-echo": "^2.0.2",
     "pusher-js": "^8.4.0"
