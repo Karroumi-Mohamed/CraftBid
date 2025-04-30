@@ -8,6 +8,8 @@ use App\Models\Product;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use App\Helpers\SettingsHelper;
+use Carbon\Carbon;
 
 class AuctionController extends Controller
 {
@@ -28,8 +30,9 @@ class AuctionController extends Controller
 
     public function store(Request $request)
     {
-        $minDuration = 24;
-        $maxDuration = 720;
+        $minDurationHours = (int)SettingsHelper::get('min_auction_duration_hours', 1);
+        $maxDurationDays = (int)SettingsHelper::get('max_auction_duration_days', 14);
+        $maxDurationHours = $maxDurationDays * 24;
 
         $rules = [
             'product_id' => 'required|integer|exists:products,id',
@@ -39,68 +42,52 @@ class AuctionController extends Controller
             'is_visible' => 'boolean',
             'properties' => 'nullable|json',
             'start_now' => 'boolean',
-            'end_after_24h' => 'boolean',
+            'end_date' => 'required_without:end_after_hours|nullable|date',
+            'end_after_hours' => 'required_without:end_date|nullable|integer|min:' . $minDurationHours . '|max:' . $maxDurationHours,
         ];
 
         if (!$request->input('start_now', false)) {
             $rules['start_date'] = 'required|date';
         }
 
-        if (!$request->input('end_after_24h', false)) {
-            $rules['end_date'] = 'required|date';
-        }
-
         $validator = validator($request->all(), $rules);
 
-        $validator->after(function ($validator) use ($request, $minDuration, $maxDuration) {
-            $now = \Carbon\Carbon::now();
+        $validator->after(function ($validator) use ($request, $minDurationHours, $maxDurationHours) {
+            $now = Carbon::now();
+            $startDate = $request->input('start_now', false) ? $now : new Carbon($request->start_date);
 
-            if ($request->input('start_now', false)) {
-                $startDate = $now;
-            } else {
-                if (!$request->has('start_date')) {
-                    $validator->errors()->add('start_date', 'Start date is required when not using "Start Now".');
-                    return;
-                }
-                $startDate = new \Carbon\Carbon($request->start_date);
-
-                if ($startDate->lt($now)) {
-                    $validator->errors()->add('start_date', 'The auction start date must be in the future.');
-                }
-
-                $oneWeekFromNow = (clone $now)->addWeek();
-                if ($startDate->gt($oneWeekFromNow)) {
-                    $validator->errors()->add('start_date', 'Auctions can only be scheduled up to one week in advance.');
-                }
+            if (!$request->input('start_now', false) && $startDate->lt($now)) {
+                $validator->errors()->add('start_date', 'The auction start date must be in the future.');
             }
 
-            if ($request->input('end_after_24h', false)) {
-                $endDate = (clone $startDate)->addHours(24);
-            } else {
-                if (!$request->has('end_date')) {
-                    $validator->errors()->add('end_date', 'End date is required when not using "End After 24h".');
-                    return;
-                }
-                $endDate = new \Carbon\Carbon($request->end_date);
-
+            $endDate = null;
+            $durationHours = null;
+            if ($request->filled('end_date')) {
+                $endDate = new Carbon($request->end_date);
                 if ($endDate->lte($startDate)) {
                     $validator->errors()->add('end_date', 'End date must be after start date.');
+                    return;
                 }
+                $durationHours = $startDate->diffInHours($endDate);
+            } elseif ($request->filled('end_after_hours')) {
+                $durationHours = (int)$request->end_after_hours;
+                $endDate = (clone $startDate)->addHours($durationHours);
+            } else {
+                $validator->errors()->add('end_date', 'Either End Date or End After Hours is required.');
+                return;
             }
 
-            $durationHours = $startDate->diffInHours($endDate);
-
-            if ($durationHours < $minDuration) {
+            if ($durationHours < $minDurationHours) {
                 $validator->errors()->add(
-                    'end_date',
-                    "The auction must run for at least {$minDuration} hour(s)."
+                    'end_after_hours',
+                    "The auction must run for at least {$minDurationHours} hour(s)."
                 );
             }
 
-            if ($durationHours > $maxDuration) {
+            if ($durationHours > $maxDurationHours) {
                 $validator->errors()->add(
-                    'end_date',
-                    "The auction cannot run for more than {$maxDuration} hours (30 days)."
+                    'end_after_hours',
+                    "The auction cannot run for more than {$maxDurationHours} hours ({$maxDurationDays} days)."
                 );
             }
         });
@@ -141,18 +128,11 @@ class AuctionController extends Controller
             ], 422);
         }
 
-        $now = \Carbon\Carbon::now();
-
-        if ($request->input('start_now', false)) {
-            $startDate = $now;
+        $startDate = $request->input('start_now', false) ? Carbon::now() : new Carbon($validatedData['start_date']);
+        if ($request->filled('end_after_hours')) {
+            $endDate = (clone $startDate)->addHours((int)$validatedData['end_after_hours']);
         } else {
-            $startDate = new \Carbon\Carbon($validatedData['start_date']);
-        }
-
-        if ($request->input('end_after_24h', false)) {
-            $endDate = (clone $startDate)->addHours(24);
-        } else {
-            $endDate = new \Carbon\Carbon($validatedData['end_date']);
+            $endDate = new Carbon($validatedData['end_date']);
         }
 
         DB::beginTransaction();
