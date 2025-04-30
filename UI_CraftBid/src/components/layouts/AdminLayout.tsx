@@ -2,7 +2,7 @@ import React from 'react';
 import { Link, Outlet } from 'react-router-dom';
 import LogoutButton from '../auth/LogoutButton';
 import { useAuth } from '@/contexts/AuthContext';
-import { LayoutDashboard, Users, Shapes, Settings, ShieldCheck, Gavel } from 'lucide-react';
+import { LayoutDashboard, Users, Shapes, Settings, ShieldCheck, Gavel, Banknote, FileText } from 'lucide-react';
 
 const AdminSidebar: React.FC = () => {
   const { user } = useAuth();
@@ -40,6 +40,12 @@ const AdminSidebar: React.FC = () => {
         </Link>
         <Link to="/admin/auctions" className="flex items-center gap-3 px-3 py-2 rounded hover:bg-gray-700 hover:text-white transition-colors">
             <Gavel size={18} /> Auction Management
+        </Link>
+        <Link to="/admin/withdrawals" className="flex items-center gap-3 px-3 py-2 rounded hover:bg-gray-700 hover:text-white transition-colors">
+            <Banknote size={18} /> Withdrawal Requests
+        </Link>
+        <Link to="/admin/reports" className="flex items-center gap-3 px-3 py-2 rounded hover:bg-gray-700 hover:text-white transition-colors">
+            <FileText size={18} /> Financial Reports
         </Link>
 
         <p className="text-xs uppercase text-gray-500 font-semibold pt-4 mb-2 px-3">System</p>

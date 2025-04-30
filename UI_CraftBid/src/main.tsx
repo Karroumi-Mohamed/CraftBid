@@ -40,6 +40,8 @@ import AdminAuctionManagementPage from './pages/admin/AdminAuctionManagementPage
 import AdminSettingsPage from './pages/admin/AdminSettingsPage';
 import AddProductPage from './pages/dashboard/AddProductPage';
 import EditProductPage from './pages/dashboard/EditProductPage';
+import AdminWithdrawalManagementPage from './pages/admin/AdminWithdrawalManagementPage';
+import AdminFinancialReportsPage from './pages/admin/AdminFinancialReportsPage';
 
 const router = createBrowserRouter([
   {
@@ -130,6 +132,8 @@ const router = createBrowserRouter([
       { path: "artisans", element: <AdminArtisanVerificationPage /> },
       { path: "products", element: <AdminProductManagementPage /> },
       { path: "auctions", element: <AdminAuctionManagementPage /> },
+      { path: "withdrawals", element: <AdminWithdrawalManagementPage /> },
+      { path: "reports", element: <AdminFinancialReportsPage /> },
       { path: "settings", element: <AdminSettingsPage /> },
     ]
   },
