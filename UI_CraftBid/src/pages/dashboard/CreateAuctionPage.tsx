@@ -22,7 +22,7 @@ import {
 } from "@/components/ui/select";
 import { useNavigate } from 'react-router-dom';
 import { Loader2, AlertCircle, Calendar, Clock, DollarSign, ChevronUp } from 'lucide-react';
-import { format, setHours, setMinutes, getHours, getMinutes } from 'date-fns';
+import { format, setHours, setMinutes, getHours, getMinutes, addHours, addDays } from 'date-fns';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar as CalendarComponent } from '@/components/ui/calendar';
 import { cn } from '@/lib/utils';
@@ -37,6 +37,12 @@ interface Product {
     path: string;
     is_primary: boolean;
   }[];
+}
+
+interface AuctionDurationSettings {
+  min: number; 
+  max: number; 
+  default: number; 
 }
 
 const CreateAuctionPage: React.FC = () => {
@@ -54,9 +60,7 @@ const CreateAuctionPage: React.FC = () => {
   const [startHour, setStartHour] = useState<string>("14"); 
   const [startMinute, setStartMinute] = useState<string>("00");
   
-  const [endDate, setEndDate] = useState<Date | undefined>(
-    new Date(new Date().setDate(new Date().getDate() + 7)) 
-  );
+  const [endDate, setEndDate] = useState<Date | undefined>(undefined);
   const [endHour, setEndHour] = useState<string>("14"); 
   const [endMinute, setEndMinute] = useState<string>("00");
   
@@ -64,9 +68,51 @@ const CreateAuctionPage: React.FC = () => {
 
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [isFetchingProducts, setIsFetchingProducts] = useState<boolean>(true);
+  const [isFetchingSettings, setIsFetchingSettings] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+  const [settingsError, setSettingsError] = useState<string | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
+  const [durationSettings, setDurationSettings] = useState<AuctionDurationSettings | null>(null);
+
+  useEffect(() => {
+    const fetchDurationSettings = async () => {
+      setIsFetchingSettings(true);
+      setSettingsError(null);
+      try {
+        const response = await makeRequest<AuctionDurationSettings>(api.get('/settings/auction-duration'));
+        if (response.success && response.data) {
+          setDurationSettings(response.data);
+          const now = new Date();
+          const defaultEndDate = new Date(now.getTime() + response.data.default * 60 * 60 * 1000);
+          setEndDate(defaultEndDate);
+          setEndHour(defaultEndDate.getHours().toString());
+          setEndMinute(defaultEndDate.getMinutes().toString());
+        } else {
+          console.error("Fetch duration settings error:", response.error);
+          setSettingsError('Failed to load auction duration settings. Using defaults.');
+          setDurationSettings({ min: 24, max: 720, default: 168 });
+          const now = new Date();
+          const fallbackEndDate = new Date(now.getTime() + 168 * 60 * 60 * 1000);
+          setEndDate(fallbackEndDate);
+          setEndHour(fallbackEndDate.getHours().toString());
+          setEndMinute(fallbackEndDate.getMinutes().toString());
+        }
+      } catch (err) {
+        console.error("Error fetching duration settings:", err);
+        setSettingsError('An error occurred while loading auction duration settings. Using defaults.');
+        setDurationSettings({ min: 24, max: 720, default: 168 });
+        const now = new Date();
+        const fallbackEndDate = new Date(now.getTime() + 168 * 60 * 60 * 1000);
+        setEndDate(fallbackEndDate);
+        setEndHour(fallbackEndDate.getHours().toString());
+        setEndMinute(fallbackEndDate.getMinutes().toString());
+      } finally {
+        setIsFetchingSettings(false);
+      }
+    };
+    fetchDurationSettings();
+  }, []);
 
   useEffect(() => {
     const fetchProducts = async () => {
@@ -148,6 +194,33 @@ const CreateAuctionPage: React.FC = () => {
     return newDate;
   };
 
+  const formatDurationForMessage = (hours: number): string => {
+    if (hours < 1) return "less than an hour"; 
+    if (hours < 24) {
+      return `${hours} hour${hours > 1 ? 's' : ''}`;
+    }
+    const days = Math.floor(hours / 24);
+    const remainingHours = hours % 24;
+    let message = `${days} day${days > 1 ? 's' : ''}`;
+    if (remainingHours > 0) {
+      return `${hours} hours (${days} day${days > 1 ? 's' : ''}${remainingHours > 0 ? ` and ${remainingHours} hour${remainingHours > 1 ? 's' : ''}` : ''})`;
+    } else {
+        message += ` (${hours} hours)`; 
+    }
+    return message;
+  };
+
+  const calculateMinEndDate = (start: Date | null): Date | undefined => {
+    if (!start || !durationSettings) return undefined;
+    const minEnd = addHours(start, durationSettings.min);
+    return new Date(minEnd.getFullYear(), minEnd.getMonth(), minEnd.getDate());
+  };
+
+  const calculateMaxEndDate = (start: Date | null): Date | undefined => {
+    if (!start || !durationSettings) return undefined;
+    return addHours(start, durationSettings.max);
+  };
+
   const validateForm = (): boolean => {
     const errors: Record<string, string> = {};
     
@@ -209,13 +282,16 @@ const CreateAuctionPage: React.FC = () => {
       startDateTime = now;
     } else {
       startDateTime = getDateWithTime(startDate, startHour, startMinute);
-      if (startDateTime && startDateTime < now) {
-        errors.startTime = 'Start time must be in the future';
+      if (startDateTime && startDateTime.getTime() < now.getTime() - 60000) {
+        errors.startTime = 'Start time cannot be in the past';
       }
     }
     
     if (endAfter24h && startDateTime) {
       endDateTime = new Date(startDateTime.getTime() + 24 * 60 * 60 * 1000);
+      if (durationSettings && 24 < durationSettings.min) {
+         console.warn("24h duration is less than minimum required duration.");
+      }
     } else {
       endDateTime = getDateWithTime(endDate, endHour, endMinute);
     }
@@ -224,16 +300,18 @@ const CreateAuctionPage: React.FC = () => {
       errors.endTime = 'End date/time must be after start date/time';
     }
     
-    if (startDateTime && endDateTime) {
+    if (startDateTime && endDateTime && durationSettings) {
       const durationHours = (endDateTime.getTime() - startDateTime.getTime()) / (1000 * 60 * 60);
       
-      if (durationHours < 24) {
-        errors.endTime = 'Auction must run for at least 24 hours (1 day)';
+      if (Math.round(durationHours) < durationSettings.min) {
+        errors.endTime = `Auction duration must be at least ${formatDurationForMessage(durationSettings.min)}`;
       }
       
-      if (durationHours > 720) {
-        errors.endTime = 'Auction cannot run for more than 30 days';
+      if (Math.round(durationHours) > durationSettings.max) {
+        errors.endTime = `Auction duration cannot exceed ${formatDurationForMessage(durationSettings.max)}`;
       }
+    } else if (!durationSettings && !isFetchingSettings) {
+        errors.durationSettings = settingsError || 'Could not validate duration due to missing settings.';
     }
     
     setFormErrors(errors);
@@ -243,6 +321,15 @@ const CreateAuctionPage: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    if (isFetchingSettings) {
+      setError("Please wait, loading auction settings...");
+      return;
+    }
+    if (!durationSettings) {
+      setError(settingsError || "Cannot create auction: Failed to load required settings.");
+      return;
+    }
+
     if (!validateForm()) {
       return;
     }
@@ -326,6 +413,16 @@ const CreateAuctionPage: React.FC = () => {
     const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000';
     return primary ? `${baseUrl}/storage/${primary.path}` : null;
   };
+
+  const currentStartDateTime = startNow ? new Date() : getDateWithTime(startDate, startHour, startMinute);
+  const minEndDateForCalendar = calculateMinEndDate(currentStartDateTime);
+  const maxEndDateForCalendar = calculateMaxEndDate(currentStartDateTime);
+
+  console.log("Duration Settings:", durationSettings);
+  console.log("Current Start Date/Time:", currentStartDateTime);
+  console.log("Min End Date (for Calendar):", minEndDateForCalendar);
+  console.log("Max End Date (for Calendar):", maxEndDateForCalendar);
+
 
   return (
     <div className="max-w-4xl mx-auto">
@@ -623,6 +720,7 @@ const CreateAuctionPage: React.FC = () => {
                                   !endDate && "text-muted-foreground",
                                   formErrors.endDate && "border-red-500"
                                 )}
+                                disabled={isFetchingSettings || !currentStartDateTime} 
                               >
                                 <Calendar className="mr-2 h-4 w-4" />
                                 {endDate ? format(endDate, "PPP") : <span>Pick a date</span>}
@@ -634,7 +732,13 @@ const CreateAuctionPage: React.FC = () => {
                                 selected={endDate}
                                 onSelect={setEndDate}
                                 initialFocus
-                                disabled={(date) => date < new Date()}
+                                fromDate={minEndDateForCalendar} 
+                                toDate={maxEndDateForCalendar} 
+                                disabled={(date) => 
+                                  (minEndDateForCalendar && date < minEndDateForCalendar) ||
+                                  (maxEndDateForCalendar && date > maxEndDateForCalendar) ||
+                                  date < new Date(new Date().setHours(0,0,0,0)) 
+                                }
                               />
                             </PopoverContent>
                           </Popover>
@@ -651,6 +755,7 @@ const CreateAuctionPage: React.FC = () => {
                                 onChange={(e) => setEndHour(e.target.value)}
                                 placeholder="14"
                                 className={cn(formErrors.endHour && "border-red-500")}
+                                disabled={isFetchingSettings}
                               />
                               {formErrors.endHour && (
                                 <p className="text-sm text-red-500">{formErrors.endHour}</p>
@@ -668,6 +773,7 @@ const CreateAuctionPage: React.FC = () => {
                                 onChange={(e) => setEndMinute(e.target.value)}
                                 placeholder="00"
                                 className={cn(formErrors.endMinute && "border-red-500")}
+                                disabled={isFetchingSettings}
                               />
                               {formErrors.endMinute && (
                                 <p className="text-sm text-red-500">{formErrors.endMinute}</p>
@@ -692,13 +798,25 @@ const CreateAuctionPage: React.FC = () => {
                   </div>
                 </div>
                 
-                <div className="bg-muted p-3 rounded-md mt-4">
+                <div className="bg-muted p-3 rounded-md mt-4 md:col-span-2">
                   <h4 className="text-sm font-medium mb-1">Auction Rules:</h4>
-                  <ul className="text-xs text-muted-foreground space-y-1 list-disc pl-4">
-                    <li>Duration: Auctions must run for at least 24 hours (1 day)</li>
-                    <li>Duration: Auctions cannot run for more than 30 days</li>
-                    <li>Scheduling: You can start an auction immediately or schedule it up to one week in advance</li>
-                  </ul>
+                  {isFetchingSettings ? (
+                     <p className="text-xs text-muted-foreground">Loading duration rules...</p>
+                  ) : durationSettings ? (
+                    <ul className="text-xs text-muted-foreground space-y-1 list-disc pl-4">
+                      <li>
+                        Min Duration: Auctions must run for at least 
+                        {` ${durationSettings.min} hours (${Math.ceil(durationSettings.min / 24)} day(s))`}
+                      </li>
+                      <li>
+                        Max Duration: Auctions cannot run for more than 
+                        {` ${durationSettings.max} hours (${Math.floor(durationSettings.max / 24)} day(s))`}
+                      </li>
+                      <li>Scheduling: You can start an auction immediately or schedule it for the future</li>
+                    </ul>
+                  ) : (
+                     <p className="text-xs text-yellow-600">Could not load duration rules. Using defaults.</p>
+                  )}
                 </div>
               </div>
             </CardContent>
@@ -730,6 +848,13 @@ const CreateAuctionPage: React.FC = () => {
             </CardContent>
           </Card>
           
+          {settingsError && (
+            <div className="flex items-center space-x-2 text-sm text-yellow-600 bg-yellow-50 p-3 rounded-md mb-4">
+              <AlertCircle className="h-4 w-4" />
+              <span>{settingsError} Using default durations: Min {durationSettings?.min || 'N/A'}h, Max {durationSettings?.max || 'N/A'}h, Default {durationSettings?.default || 'N/A'}h.</span>
+            </div>
+          )}
+          
           <div className="flex justify-between">
             <Button 
               type="button" 
@@ -738,7 +863,7 @@ const CreateAuctionPage: React.FC = () => {
             >
               Cancel
             </Button>
-            <Button type="submit" disabled={isLoading}>
+            <Button type="submit" disabled={isLoading || isFetchingProducts || isFetchingSettings}>
               {isLoading ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
