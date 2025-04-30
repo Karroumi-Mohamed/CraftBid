@@ -10,6 +10,11 @@ use App\Http\Controllers\Api\Admin\ProductController;
 use App\Http\Controllers\Api\Artisan\AuctionController;
 use App\Http\Controllers\Api\UserController;
 use App\Http\Controllers\Api\BidController;
+use App\Http\Controllers\Api\WalletController;
+use App\Http\Controllers\Api\Admin\WalletController as AdminWalletController;
+use App\Http\Controllers\Api\Admin\FinancialReportController;
+use App\Http\Controllers\Api\Admin\SettingsController as AdminSettingsController;
+use App\Http\Controllers\Api\SettingsController as GeneralSettingsController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -82,7 +87,35 @@ Route::middleware(['auth:sanctum'])->group(function () {
             Route::patch('/{artisan}/reject', 'reject')->name('reject');
             Route::patch('/{artisan}/suspend', 'suspend')->name('suspend');
         });
+
+        Route::prefix('wallet-admin')->name('wallet-admin.')->controller(AdminWalletController::class)->group(function () {
+            Route::get('/withdrawals', 'indexWithdrawals')->name('withdrawals.index');
+            Route::patch('/withdrawals/{withdrawalRequest}/approve', 'approveWithdrawal')->name('withdrawals.approve');
+            Route::patch('/withdrawals/{withdrawalRequest}/reject', 'rejectWithdrawal')->name('withdrawals.reject');
+            Route::post('/manual-deposit', 'manualDeposit')->name('manual-deposit.store');
+        });
+
+        Route::prefix('reports')->name('reports.')->controller(FinancialReportController::class)->group(function () {
+            Route::get('/summary', 'getSummary')->name('summary');
+            Route::get('/transactions', 'listAllTransactions')->name('transactions.index');
+            Route::get('/revenue-trend', 'getRevenueTrend')->name('revenue.trend');
+        });
+
+        Route::prefix('settings')->name('settings.')->controller(AdminSettingsController::class)->group(function () {
+            Route::get('/', 'getSettings')->name('index');
+            Route::put('/', 'updateSettings')->name('update');
+            Route::post('/update-password', 'updateAdminPassword')->name('update-password');
+        });
     });
+
+    Route::prefix('wallet')->name('wallet.')->controller(WalletController::class)->group(function () {
+        Route::get('/balance', 'showBalance')->name('balance.show');
+        Route::get('/transactions', 'indexTransactions')->name('transactions.index');
+        Route::post('/manual-deposit', 'storeManualDeposit')->name('manual-deposit.store');
+        Route::post('/withdrawal-requests', 'storeWithdrawalRequest')->middleware('role:artisan')->name('withdrawal-requests.store');
+    });
+
+    Route::get('/settings/auction-duration', [GeneralSettingsController::class, 'getAuctionDurationSettings'])->name('settings.auction-duration');
 });
 
 Route::middleware('auth:sanctum')->group(function () {
