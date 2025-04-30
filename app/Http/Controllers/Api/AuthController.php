@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\User;
 use App\Models\Artisan;
+use App\Models\Wallet;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
@@ -32,6 +33,8 @@ class AuthController extends Controller
                     'email' => $fields['email'],
                     'password' => Hash::make($fields['password']),
                 ]);
+
+                Wallet::create(['user_id' => $newUser->id]);
 
                 $newUser->assignRole($fields['role']);
 
