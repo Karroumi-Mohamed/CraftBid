@@ -50,6 +50,21 @@ interface Bid {
   };
 }
 
+interface BidPlacedEventPayload {
+    bid: Bid;
+    auction: {
+        id: number;
+        price: string;
+        bid_count: number;
+    };
+}
+
+interface AuctionEndedEventPayload {
+    auctionId: number;
+    winner: string;
+    finalPrice: number;
+}
+
 const AuctionDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -62,6 +77,7 @@ const AuctionDetailPage: React.FC = () => {
   const [bidError, setBidError] = useState<string | null>(null);
   const [bidSuccess, setBidSuccess] = useState<string | null>(null);
   const [placingBid, setPlacingBid] = useState(false);
+  const [highestBid, setHighestBid] = useState<number | null>(null);
 
   const fetchAuction = async () => {
     try {
@@ -80,8 +96,6 @@ const AuctionDetailPage: React.FC = () => {
     }
   };
 
-
-
   const fetchBids = async () => {
     try {
       const response = await makeRequest(api.get(`/auctions/${id}/bids`));
@@ -95,23 +109,69 @@ const AuctionDetailPage: React.FC = () => {
   };
 
   useEffect(() => {
+    if (auction) {
+      setHighestBid(parseFloat(auction.price));
+    }
+  }, [auction]);
+
+  useEffect(() => {
     fetchAuction();
     fetchBids();
   }, [id]);
 
-    useEffect(() => {
-        if (!auction) return;
-        console.log('Fetching auction bids from auction.', auction?.id);
-        const channel = echo.channel(`auction.${auction.id}`);
-        channel
-            .listen('.bid.placed', (e: any) => {
-                console.log('Bid placed:', e);
-            })
-        return () => {
-            channel.stopListening('.bid.placed');
-        }
-    }, [auction]);
+  useEffect(() => {
+    if (!auction?.id) return;
 
+    const channelName = `auction.${auction.id}`;
+    console.log(`Subscribing to channel: ${channelName}`);
+    const channel = echo.channel(channelName);
+
+    channel.listen('.bid.placed', (e: BidPlacedEventPayload) => {
+      console.log('WebSocket Event Received (bid.placed):', e);
+      setBids(prevBids => {
+        if (prevBids.some(b => b.id === e.bid.id)) return prevBids;
+        return [e.bid, ...prevBids];
+      });
+      setHighestBid(parseFloat(e.auction.price));
+      setAuction(prevAuction => {
+        if (!prevAuction) return null;
+        return {
+          ...prevAuction,
+          price: e.auction.price,
+          bid_count: e.auction.bid_count
+        };
+      });
+      setBidSuccess(null);
+      setBidError(null);
+    });
+
+    channel.listen('.auction.ended', (e: AuctionEndedEventPayload) => {
+      console.log('WebSocket Event Received (auction.ended):', e);
+
+      setAuction(prevAuction => {
+        if (!prevAuction || prevAuction.id !== e.auctionId) return prevAuction; // Check if event is for current auction
+        return {
+          ...prevAuction,
+          status: 'ended',
+          price: e.finalPrice.toString(),
+
+        };
+      });
+
+      setHighestBid(e.finalPrice);
+
+      setBidSuccess(`Auction ended! Winner: ${e.winner} at $${e.finalPrice.toFixed(2)}`);
+      setBidError(null);
+
+    });
+
+    return () => {
+      console.log(`Leaving channel: ${channelName}`);
+      channel.stopListening('.bid.placed');
+      channel.stopListening('.auction.ended');
+      echo.leave(channelName);
+    };
+  }, [auction?.id]);
 
   const handleBidSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -130,10 +190,8 @@ const AuctionDetailPage: React.FC = () => {
       }));
 
       if (response.success) {
-        setBidSuccess('Bid placed successfully!');
+        setBidSuccess('Bid placed successfully! Waiting for confirmation...');
         setBidAmount('');
-        fetchAuction();
-        fetchBids();
       } else {
         setBidError(response.error?.message || 'Failed to place bid');
       }
@@ -197,7 +255,7 @@ const AuctionDetailPage: React.FC = () => {
             <CardContent className="space-y-4">
               <div>
                 <p className="text-2xl font-bold">
-                  Current Bid: ${parseFloat(auction.price)}
+                  Current Bid: ${highestBid !== null ? highestBid.toFixed(2) : 'Loading...'}
                 </p>
                 <p className="text-sm text-gray-500">
                   {auction.bid_count} bids
@@ -261,10 +319,10 @@ const AuctionDetailPage: React.FC = () => {
                 </form>
               )}
 
-              {!isActive && (
+              {!isActive && auction && (
                 <Alert>
                   <AlertDescription>
-                    This auction has {auction.status === 'ended' ? 'ended' : 'not started yet'}.
+                    This auction has {auction.status === 'ended' ? `ended. Final Price: $${auction.price}` : auction.status === 'pending' ? 'not started yet.' : 'concluded.'}
                   </AlertDescription>
                 </Alert>
               )}
@@ -280,9 +338,9 @@ const AuctionDetailPage: React.FC = () => {
                 {bids.map((bid) => (
                   <div key={bid.id} className="flex justify-between items-center">
                     <div>
-                      <p className="font-medium">{bid.user.name}</p>
+                      <p className="font-medium">{bid.user?.name ?? 'Unknown Bidder'}</p>
                       <p className="text-sm text-gray-500">
-                        {format(new Date(bid.created_at), 'PPp')}
+                        {bid.created_at ? format(new Date(bid.created_at), 'PPp') : 'Date unknown'}
                       </p>
                     </div>
                     <p className="font-bold">${bid.amount}</p>
