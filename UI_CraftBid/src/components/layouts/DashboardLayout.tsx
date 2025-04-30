@@ -26,6 +26,7 @@ const SidebarPlaceholder: React.FC = () => {
             <Link to="/dashboard/my-products" className="block px-3 py-2 rounded hover:bg-gray-200 dark:hover:bg-gray-700">My Products</Link>
             <Link to="/dashboard/my-auctions" className="block px-3 py-2 rounded hover:bg-gray-200 dark:hover:bg-gray-700">My Auctions</Link>
             <Link to="/dashboard/artisan-profile" className="block px-3 py-2 rounded hover:bg-gray-200 dark:hover:bg-gray-700">My Profile</Link>
+            <Link to="/dashboard/wallet" className="block px-3 py-2 rounded hover:bg-gray-200 dark:hover:bg-gray-700">My Wallet</Link>
           </>
         )}
          {!isArtisan && (
