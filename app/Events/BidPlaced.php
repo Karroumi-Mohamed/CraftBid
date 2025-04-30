@@ -26,7 +26,7 @@ class BidPlaced implements ShouldBroadcastNow
         public Auction $auction
     )
     {
-
+        $this->bid->loadMissing('user');
     }
 
     /**
@@ -43,10 +43,25 @@ class BidPlaced implements ShouldBroadcastNow
     }
     public function broadcastWith(): array
     {
+        $this->bid->loadMissing('user');
+
         return [
-            'bid' => $this->bid,
-            'auction' => $this->auction,
-            'createdAt' => $this->bid->created_at->format('Y-m-d H:i:s'),
+            'bid' => [ 
+                'id' => $this->bid->id,
+                'auction_id' => $this->bid->auction_id,
+                'user_id' => $this->bid->user_id,
+                'amount' => $this->bid->amount,
+                'created_at' => $this->bid->created_at->toIso8601String(), 
+                'user' => [ 
+                    'id' => $this->bid->user->id,
+                    'name' => $this->bid->user->name,
+                ]
+            ],
+            'auction' => [ 
+                 'id' => $this->auction->id,
+                 'price' => $this->auction->price, 
+                 'bid_count' => $this->auction->bid_count, 
+            ],
         ];
     }
 
