@@ -21,14 +21,16 @@ const LoginPage: React.FC = () => {
                     <p className='text-gray-500 text-sm font-medium mt-1 mb-6 w-full text-center'>Please enter your details to sign in your account</p>
 
                     <div className='flex flex-col w-full gap-4'>
-                        <button className="flex font-medium w-full items-center justify-center gap-2 rounded-md border border-gray-300 bg-white px-4 py-3 text-black hover:bg-gray-50 shadow-sm">
+                        <button 
+                            type="button"
+                            onClick={() => {
+                                const backendUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+                                window.location.href = `${backendUrl}/api/auth/google/redirect`;
+                            }}
+                            className="flex font-medium w-full items-center justify-center gap-2 rounded-md border border-gray-300 bg-white px-4 py-3 text-black hover:bg-gray-50 shadow-sm"
+                        >
                             <img src="/public/auth/google.svg" className="h-6 w-6" alt="Google logo" />
                             Continue with Google
-                        </button>
-
-                        <button className="flex font-medium w-full items-center justify-center gap-2 rounded-md border border-gray-300 bg-white px-4 py-3 text-black hover:bg-gray-50 shadow-sm">
-                            <img src="/public/auth/apple.svg" className="h-6 w-6" alt="Apple logo" />
-                            Continue with Apple
                         </button>
 
                         <div className="relative my-6 w-full">

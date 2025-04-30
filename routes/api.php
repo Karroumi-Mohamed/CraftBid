@@ -135,3 +135,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/auctions/{auction}/bids', [BidController::class, 'history'])->name('bids.history');
     Route::get('/user/bids', [BidController::class, 'userHistory'])->name('bids.user-history');
 });
+
+Route::middleware('web')->group(function () {
+    Route::get('/auth/google/redirect', [AuthController::class, 'redirectToGoogle'])->name('google.redirect');
+    
+    Route::get('/auth/google/callback', [AuthController::class, 'handleGoogleCallback'])->name('google.callback');
+});

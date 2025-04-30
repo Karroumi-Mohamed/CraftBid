@@ -14,6 +14,8 @@ use Illuminate\Auth\Events\Verified;
 use Illuminate\Validation\ValidationException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Laravel\Socialite\Facades\Socialite;
+use Exception;
 
 class AuthController extends Controller
 {
@@ -186,5 +188,81 @@ class AuthController extends Controller
             'idStatus' => $idStatus,
             'hasArtisanProfile' => $hasArtisanProfile,
         ]);
+    }
+
+
+    public function redirectToGoogle()
+    { 
+        return Socialite::driver('google')
+            ->scopes(['openid', 'profile', 'email'])
+            ->redirect();
+    }
+
+    public function handleGoogleCallback(Request $request)
+    {
+        $frontendUrl = config('app.frontend_url', env('FRONTEND_URL', 'http://127.0.0.1:5173'));
+        $successRedirect = $frontendUrl . '/dashboard';
+        $failureRedirect = $frontendUrl . '/login?error=google_failed'; 
+
+        try {
+            $googleUser = Socialite::driver('google')->stateless()->user(); 
+            
+            Log::info('Google User Data Received:', [
+                'id' => $googleUser->getId(),
+                'name' => $googleUser->getName(),
+                'email' => $googleUser->getEmail(),
+                'avatar' => $googleUser->getAvatar(),
+                'token' => $googleUser->token,
+                'all_user_data' => (array) $googleUser 
+            ]);
+            
+            $user = DB::transaction(function () use ($googleUser) {
+                $existingUser = User::where('google_id', $googleUser->getId())->first();
+
+                if ($existingUser) {
+                    return $existingUser;
+                } else {
+                    $userWithEmail = User::where('email', $googleUser->getEmail())->first();
+                    if($userWithEmail) {
+                        $userWithEmail->update([
+                             'google_id' => $googleUser->getId(),
+                             'avatar' => $googleUser->getAvatar(),
+                             'email_verified_at' => $userWithEmail->email_verified_at ?? now(),
+                         ]);
+                        return $userWithEmail;
+                    }
+
+                    $newUser = User::create([
+                        'name' => $googleUser->getName(),
+                        'email' => $googleUser->getEmail(),
+                        'google_id' => $googleUser->getId(),
+                        'avatar' => $googleUser->getAvatar(),
+                        'password' => null,
+                        'email_verified_at' => now(),
+                    ]);
+
+                    Wallet::create(['user_id' => $newUser->id]);
+
+                    $newUser->assignRole('buyer'); 
+                    
+                    event(new Registered($newUser));
+
+                    return $newUser;
+                }
+            });
+
+            Auth::login($user, true);
+            $request->session()->regenerate();
+
+            Log::info('User logged in successfully via Google.', ['user_id' => $user->id]);
+            return redirect()->intended($successRedirect);
+
+        } catch (Exception $e) {
+            Log::error('Google authentication failed.', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+            return redirect($failureRedirect);
+        }
     }
 }
