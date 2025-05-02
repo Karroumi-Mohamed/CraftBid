@@ -22,7 +22,7 @@ import {
 } from "@/components/ui/select";
 import { useNavigate } from 'react-router-dom';
 import { Loader2, AlertCircle, Calendar, Clock, DollarSign, ChevronUp } from 'lucide-react';
-import { format, setHours, setMinutes, getHours, getMinutes, addHours, addDays } from 'date-fns';
+import { format, setHours, setMinutes, getHours, getMinutes, addMinutes, differenceInMinutes, isBefore, startOfDay } from 'date-fns';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar as CalendarComponent } from '@/components/ui/calendar';
 import { cn } from '@/lib/utils';
@@ -54,7 +54,7 @@ const CreateAuctionPage: React.FC = () => {
   const [quantity, setQuantity] = useState<string>('1');
   
   const [startNow, setStartNow] = useState<boolean>(false);
-  const [endAfter24h, setEndAfter24h] = useState<boolean>(false);
+  const [endAfterDefault, setEndAfterDefault] = useState<boolean>(true); 
   
   const [startDate, setStartDate] = useState<Date | undefined>(new Date());
   const [startHour, setStartHour] = useState<string>("14"); 
@@ -84,29 +84,34 @@ const CreateAuctionPage: React.FC = () => {
         if (response.success && response.data) {
           setDurationSettings(response.data);
           const now = new Date();
-          const defaultEndDate = new Date(now.getTime() + response.data.default * 60 * 60 * 1000);
+          const defaultEndDate = addMinutes(now, response.data.default);
           setEndDate(defaultEndDate);
-          setEndHour(defaultEndDate.getHours().toString());
-          setEndMinute(defaultEndDate.getMinutes().toString());
+          setEndHour(defaultEndDate.getHours().toString().padStart(2, '0'));
+          setEndMinute(defaultEndDate.getMinutes().toString().padStart(2, '0'));
+          setEndAfterDefault(true);
         } else {
           console.error("Fetch duration settings error:", response.error);
           setSettingsError('Failed to load auction duration settings. Using defaults.');
-          setDurationSettings({ min: 24, max: 720, default: 168 });
+          const fallbackSettings: AuctionDurationSettings = { min: 1, max: 14 * 24 * 60, default: 7 * 24 * 60 }; // Defaults in minutes
+          setDurationSettings(fallbackSettings);
           const now = new Date();
-          const fallbackEndDate = new Date(now.getTime() + 168 * 60 * 60 * 1000);
+          const fallbackEndDate = addMinutes(now, fallbackSettings.default);
           setEndDate(fallbackEndDate);
-          setEndHour(fallbackEndDate.getHours().toString());
-          setEndMinute(fallbackEndDate.getMinutes().toString());
+          setEndHour(fallbackEndDate.getHours().toString().padStart(2, '0'));
+          setEndMinute(fallbackEndDate.getMinutes().toString().padStart(2, '0'));
+          setEndAfterDefault(true);
         }
       } catch (err) {
         console.error("Error fetching duration settings:", err);
         setSettingsError('An error occurred while loading auction duration settings. Using defaults.');
-        setDurationSettings({ min: 24, max: 720, default: 168 });
+        const fallbackSettings: AuctionDurationSettings = { min: 1, max: 14 * 24 * 60, default: 7 * 24 * 60 }; // Defaults in minutes
+        setDurationSettings(fallbackSettings);
         const now = new Date();
-        const fallbackEndDate = new Date(now.getTime() + 168 * 60 * 60 * 1000);
+        const fallbackEndDate = addMinutes(now, fallbackSettings.default);
         setEndDate(fallbackEndDate);
-        setEndHour(fallbackEndDate.getHours().toString());
-        setEndMinute(fallbackEndDate.getMinutes().toString());
+        setEndHour(fallbackEndDate.getHours().toString().padStart(2, '0'));
+        setEndMinute(fallbackEndDate.getMinutes().toString().padStart(2, '0'));
+        setEndAfterDefault(true);
       } finally {
         setIsFetchingSettings(false);
       }
@@ -146,28 +151,42 @@ const CreateAuctionPage: React.FC = () => {
   useEffect(() => {
     if (startNow) {
       const now = new Date();
+      const nowHour = now.getHours().toString().padStart(2, '0');
+      const nowMinute = now.getMinutes().toString().padStart(2, '0');
       setStartDate(now);
-      setStartHour(now.getHours().toString());
-      setStartMinute(now.getMinutes().toString());
-      
-      if (endAfter24h) {
-        const endDateTime = new Date(now.getTime() + 24 * 60 * 60 * 1000);
-        setEndDate(endDateTime);
-        setEndHour(endDateTime.getHours().toString());
-        setEndMinute(endDateTime.getMinutes().toString());
+      setStartHour(nowHour);
+      setStartMinute(nowMinute);
+    } 
+  }, [startNow]); 
+
+  useEffect(() => {
+    if (!endAfterDefault || !durationSettings) {
+      return; 
+    }
+
+    let baseStartTime: Date | null = null;
+    if (startNow) {
+        baseStartTime = new Date();
+    } else if (startDate && startHour && startMinute) {
+        baseStartTime = getDateWithTime(startDate, startHour, startMinute);
+    }
+
+    if (baseStartTime) {
+      const newEndDateTime = addMinutes(baseStartTime, durationSettings.default);
+      const newEndHour = newEndDateTime.getHours().toString().padStart(2, '0');
+      const newEndMinute = newEndDateTime.getMinutes().toString().padStart(2, '0');
+
+      if (endDate?.getTime() !== newEndDateTime.getTime()) {
+        setEndDate(newEndDateTime);
+      }
+      if (endHour !== newEndHour) {
+        setEndHour(newEndHour);
+      }
+      if (endMinute !== newEndMinute) {
+        setEndMinute(newEndMinute);
       }
     }
-  }, [startNow, endAfter24h]);
-  
-  useEffect(() => {
-    if (endAfter24h && startDate) {
-      const startDateTime = getDateWithTime(startDate, startHour, startMinute) || new Date();
-      const endDateTime = new Date(startDateTime.getTime() + 24 * 60 * 60 * 1000);
-      setEndDate(endDateTime);
-      setEndHour(endDateTime.getHours().toString());
-      setEndMinute(endDateTime.getMinutes().toString());
-    }
-  }, [endAfter24h, startDate, startHour, startMinute]);
+  }, [startNow, startDate, startHour, startMinute, endAfterDefault, durationSettings]); 
 
   const getDateWithTime = (date: Date | undefined, hour: string, minute: string): Date | null => {
     if (!date) return null;
@@ -180,12 +199,7 @@ const CreateAuctionPage: React.FC = () => {
       return null; 
     }
     
-    const newDate = new Date(
-      date.getFullYear(),
-      date.getMonth(),
-      date.getDate()
-    );
-    
+    const newDate = startOfDay(date);
     newDate.setHours(hourNum);
     newDate.setMinutes(minuteNum);
     newDate.setSeconds(0);
@@ -194,31 +208,43 @@ const CreateAuctionPage: React.FC = () => {
     return newDate;
   };
 
-  const formatDurationForMessage = (hours: number): string => {
-    if (hours < 1) return "less than an hour"; 
+  const formatDurationForMessage = (minutes: number): string => {
+    if (minutes < 1) return "less than a minute";
+    if (minutes < 60) return `${minutes} minute${minutes > 1 ? 's' : ''}`;
+    
+    const hours = Math.floor(minutes / 60);
+    const remainingMinutes = minutes % 60;
+    
     if (hours < 24) {
-      return `${hours} hour${hours > 1 ? 's' : ''}`;
+      let msg = `${hours} hour${hours > 1 ? 's' : ''}`;
+      if (remainingMinutes > 0) {
+        msg += ` ${remainingMinutes} minute${remainingMinutes > 1 ? 's' : ''}`;
+      }
+      return msg;
     }
+
     const days = Math.floor(hours / 24);
     const remainingHours = hours % 24;
-    let message = `${days} day${days > 1 ? 's' : ''}`;
+    
+    let msg = `${days} day${days > 1 ? 's' : ''}`;
     if (remainingHours > 0) {
-      return `${hours} hours (${days} day${days > 1 ? 's' : ''}${remainingHours > 0 ? ` and ${remainingHours} hour${remainingHours > 1 ? 's' : ''}` : ''})`;
-    } else {
-        message += ` (${hours} hours)`; 
+      msg += ` ${remainingHours} hour${remainingHours > 1 ? 's' : ''}`;
     }
-    return message;
+    if (remainingMinutes > 0) {
+      msg += ` ${remainingMinutes} minute${remainingMinutes > 1 ? 's' : ''}`;
+    }
+    return msg;
   };
 
   const calculateMinEndDate = (start: Date | null): Date | undefined => {
     if (!start || !durationSettings) return undefined;
-    const minEnd = addHours(start, durationSettings.min);
-    return new Date(minEnd.getFullYear(), minEnd.getMonth(), minEnd.getDate());
+    const minEnd = addMinutes(start, durationSettings.min);
+    return startOfDay(minEnd);
   };
 
   const calculateMaxEndDate = (start: Date | null): Date | undefined => {
     if (!start || !durationSettings) return undefined;
-    return addHours(start, durationSettings.max);
+    return addMinutes(start, durationSettings.max);
   };
 
   const validateForm = (): boolean => {
@@ -229,11 +255,11 @@ const CreateAuctionPage: React.FC = () => {
     }
     
     if (!reservePrice || parseFloat(reservePrice) <= 0) {
-      errors.reservePrice = 'Please enter a valid reserve price';
+      errors.reservePrice = 'Please enter a valid reserve price (must be > 0)';
     }
     
     if (!bidIncrement || parseFloat(bidIncrement) <= 0) {
-      errors.bidIncrement = 'Please enter a valid bid increment';
+      errors.bidIncrement = 'Please enter a valid bid increment (must be > 0)';
     }
     
     if (!quantity || parseInt(quantity) <= 0) {
@@ -257,8 +283,7 @@ const CreateAuctionPage: React.FC = () => {
       }
     }
     
-    if (!endAfter24h) {
-      if (!endDate) {
+    if (!endDate) {
         errors.endDate = 'Please select an end date';
       }
       
@@ -271,7 +296,6 @@ const CreateAuctionPage: React.FC = () => {
       
       if (isNaN(endMinuteNum) || endMinuteNum < 0 || endMinuteNum > 59) {
         errors.endMinute = 'Minute must be between 0-59';
-      }
     }
     
     let startDateTime: Date | null;
@@ -282,33 +306,26 @@ const CreateAuctionPage: React.FC = () => {
       startDateTime = now;
     } else {
       startDateTime = getDateWithTime(startDate, startHour, startMinute);
-      if (startDateTime && startDateTime.getTime() < now.getTime() - 60000) {
+      if (startDateTime && isBefore(startDateTime, addMinutes(now, -1))) { 
         errors.startTime = 'Start time cannot be in the past';
       }
     }
     
-    if (endAfter24h && startDateTime) {
-      endDateTime = new Date(startDateTime.getTime() + 24 * 60 * 60 * 1000);
-      if (durationSettings && 24 < durationSettings.min) {
-         console.warn("24h duration is less than minimum required duration.");
-      }
-    } else {
-      endDateTime = getDateWithTime(endDate, endHour, endMinute);
-    }
+    endDateTime = getDateWithTime(endDate, endHour, endMinute);
     
-    if (startDateTime && endDateTime && endDateTime <= startDateTime) {
+    if (startDateTime && endDateTime && !isBefore(startDateTime, endDateTime)) { 
       errors.endTime = 'End date/time must be after start date/time';
     }
     
     if (startDateTime && endDateTime && durationSettings) {
-      const durationHours = (endDateTime.getTime() - startDateTime.getTime()) / (1000 * 60 * 60);
+      const durationMinutes = differenceInMinutes(endDateTime, startDateTime);
       
-      if (Math.round(durationHours) < durationSettings.min) {
-        errors.endTime = `Auction duration must be at least ${formatDurationForMessage(durationSettings.min)}`;
+      if (durationMinutes < durationSettings.min) {
+        errors.endTime = `Auction duration must be at least ${formatDurationForMessage(durationSettings.min)}. Current: ${formatDurationForMessage(durationMinutes)}.`;
       }
       
-      if (Math.round(durationHours) > durationSettings.max) {
-        errors.endTime = `Auction duration cannot exceed ${formatDurationForMessage(durationSettings.max)}`;
+      if (durationMinutes > durationSettings.max) {
+        errors.endTime = `Auction duration cannot exceed ${formatDurationForMessage(durationSettings.max)}. Current: ${formatDurationForMessage(durationMinutes)}.`;
       }
     } else if (!durationSettings && !isFetchingSettings) {
         errors.durationSettings = settingsError || 'Could not validate duration due to missing settings.';
@@ -329,8 +346,13 @@ const CreateAuctionPage: React.FC = () => {
       setError(settingsError || "Cannot create auction: Failed to load required settings.");
       return;
     }
-
+    
     if (!validateForm()) {
+      const firstErrorKey = Object.keys(formErrors)[0];
+      if (firstErrorKey) {
+          const element = document.getElementById(firstErrorKey);
+          element?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
       return;
     }
     
@@ -338,29 +360,22 @@ const CreateAuctionPage: React.FC = () => {
     setError(null);
     
     let startDateTime;
-    let endDateTime;
-    
     if (startNow) {
       startDateTime = new Date();
     } else {
       startDateTime = startDate ? getDateWithTime(startDate, startHour, startMinute) : null;
     }
     
-    if (endAfter24h && startDateTime) {
-      endDateTime = new Date(startDateTime.getTime() + 24 * 60 * 60 * 1000);
-    } else {
-      endDateTime = endDate ? getDateWithTime(endDate, endHour, endMinute) : null;
-    }
+    let endDateTime = endDate ? getDateWithTime(endDate, endHour, endMinute) : null;
     
     const auctionData = {
       product_id: parseInt(productId),
       reserve_price: parseFloat(reservePrice),
       bid_increment: parseFloat(bidIncrement),
       quantity: parseInt(quantity),
-      start_date: startDateTime ? startDateTime.toISOString().slice(0, 19).replace('T', ' ') : '',
-      end_date: endDateTime ? endDateTime.toISOString().slice(0, 19).replace('T', ' ') : '',
-      start_now: startNow,
-      end_after_24h: endAfter24h,
+      start_date: startDateTime ? startDateTime.toISOString() : '', 
+      end_date: endDateTime ? endDateTime.toISOString() : '', 
+      start_now: startNow, 
       is_visible: isVisible,
     };
     
@@ -374,28 +389,25 @@ const CreateAuctionPage: React.FC = () => {
       } else {
         if (response.status === 422 && response.error?.errors) {
           const serverErrors: Record<string, string> = {};
-          
-          console.log('Validation Error Object:', response.error);
-          console.log('Error errors structure:', response.error.errors);
+          let combinedErrorMsg = "Validation errors:";
           
           Object.entries(response.error.errors).forEach(([field, messages]) => {
             if (Array.isArray(messages) && messages.length > 0) {
               const fieldMapping: Record<string, string> = {
-                'start_date': 'startTime',
-                'end_date': 'endTime',
+                'start_date': 'startDate', 
+                'end_date': 'endDate',  
                 'product_id': 'productId',
                 'reserve_price': 'reservePrice',
                 'bid_increment': 'bidIncrement'
               };
-              
               const formField = fieldMapping[field] || field;
               serverErrors[formField] = messages[0];
-              
-              setError(prev => prev ? `${prev}\n• ${field}: ${messages[0]}` : `Validation errors:\n• ${field}: ${messages[0]}`);
+              combinedErrorMsg += `\n• ${field.replace(/_/g, ' ')}: ${messages[0]}`;
             }
           });
           
           setFormErrors(prevErrors => ({ ...prevErrors, ...serverErrors }));
+          setError(combinedErrorMsg); 
         } else {
           setError(response.error?.message || 'Failed to create auction. Please try again.');
         }
@@ -418,19 +430,13 @@ const CreateAuctionPage: React.FC = () => {
   const minEndDateForCalendar = calculateMinEndDate(currentStartDateTime);
   const maxEndDateForCalendar = calculateMaxEndDate(currentStartDateTime);
 
-  console.log("Duration Settings:", durationSettings);
-  console.log("Current Start Date/Time:", currentStartDateTime);
-  console.log("Min End Date (for Calendar):", minEndDateForCalendar);
-  console.log("Max End Date (for Calendar):", maxEndDateForCalendar);
-
-
   return (
     <div className="max-w-4xl mx-auto">
       <h1 className="text-2xl font-bold mb-6">Create New Auction</h1>
       
       {error && (
-        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4 flex items-center">
-          <AlertCircle className="h-5 w-5 mr-2" />
+        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4 flex items-center whitespace-pre-wrap">
+          <AlertCircle className="h-5 w-5 mr-2 flex-shrink-0" />
           <span>{error}</span>
         </div>
       )}
@@ -471,9 +477,9 @@ const CreateAuctionPage: React.FC = () => {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="space-y-4">
+              <div className="space-y-1">
                 <Select value={productId} onValueChange={setProductId}>
-                  <SelectTrigger className={cn(formErrors.productId && "border-red-500")}>
+                  <SelectTrigger id="productId" className={cn(formErrors.productId && "border-red-500")}>
                     <SelectValue placeholder="Select a product" />
                   </SelectTrigger>
                   <SelectContent>
@@ -481,7 +487,7 @@ const CreateAuctionPage: React.FC = () => {
                       <SelectItem key={product.id} value={String(product.id)}>
                         <div className="flex items-center">
                           {getPrimaryImageUrl(product) && (
-                            <div className="w-8 h-8 bg-gray-200 rounded mr-2 overflow-hidden">
+                            <div className="w-8 h-8 bg-gray-200 rounded mr-2 overflow-hidden flex-shrink-0">
                               <img 
                                 src={getPrimaryImageUrl(product)!} 
                                 alt={product.name} 
@@ -496,7 +502,7 @@ const CreateAuctionPage: React.FC = () => {
                   </SelectContent>
                 </Select>
                 {formErrors.productId && (
-                  <p className="text-sm text-red-500">{formErrors.productId}</p>
+                  <p className="text-sm text-red-500 mt-1">{formErrors.productId}</p>
                 )}
               </div>
             </CardContent>
@@ -512,12 +518,12 @@ const CreateAuctionPage: React.FC = () => {
             <CardContent>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-4">
-                  <div>
+                  <div className="space-y-1">
                     <Label htmlFor="reservePrice">
                       Reserve Price <span className="text-red-500">*</span>
                     </Label>
-                    <div className="relative mt-1">
-                      <DollarSign className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                    <div className="relative">
+                      <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
                       <Input
                         id="reservePrice"
                         type="number"
@@ -526,22 +532,23 @@ const CreateAuctionPage: React.FC = () => {
                         value={reservePrice}
                         onChange={(e) => setReservePrice(e.target.value)}
                         className={cn("pl-9", formErrors.reservePrice && "border-red-500")}
+                        required
                       />
                     </div>
                     {formErrors.reservePrice && (
                       <p className="text-sm text-red-500">{formErrors.reservePrice}</p>
                     )}
-                    <p className="text-sm text-gray-500 mt-1">
+                    <p className="text-xs text-gray-500">
                       Minimum price you are willing to accept
                     </p>
                   </div>
                   
-                  <div>
+                  <div className="space-y-1">
                     <Label htmlFor="bidIncrement">
                       Bid Increment <span className="text-red-500">*</span>
                     </Label>
-                    <div className="relative mt-1">
-                      <ChevronUp className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                    <div className="relative">
+                      <ChevronUp className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
                       <Input
                         id="bidIncrement"
                         type="number"
@@ -550,21 +557,21 @@ const CreateAuctionPage: React.FC = () => {
                         value={bidIncrement}
                         onChange={(e) => setBidIncrement(e.target.value)}
                         className={cn("pl-9", formErrors.bidIncrement && "border-red-500")}
+                        required
                       />
                     </div>
                     {formErrors.bidIncrement && (
                       <p className="text-sm text-red-500">{formErrors.bidIncrement}</p>
                     )}
-                    <p className="text-sm text-gray-500 mt-1">
+                    <p className="text-xs text-gray-500">
                       Minimum amount each new bid must increase by
                     </p>
                   </div>
                   
-                  <div>
+                  <div className="space-y-1">
                     <Label htmlFor="quantity">
                       Quantity <span className="text-red-500">*</span>
                     </Label>
-                    <div className="relative mt-1">
                       <Input
                         id="quantity"
                         type="number"
@@ -573,33 +580,31 @@ const CreateAuctionPage: React.FC = () => {
                         value={quantity}
                         onChange={(e) => setQuantity(e.target.value)}
                         className={cn(formErrors.quantity && "border-red-500")}
+                      required
                       />
-                    </div>
                     {formErrors.quantity && (
                       <p className="text-sm text-red-500">{formErrors.quantity}</p>
                     )}
-                    <p className="text-sm text-gray-500 mt-1">
+                    <p className="text-xs text-gray-500">
                       Number of items to auction
                     </p>
                   </div>
                 </div>
                 
                 <div className="space-y-4">
-                  <div>
+                  <div className="space-y-1">
                     <Label htmlFor="startDate">
                       Start Date & Time <span className="text-red-500">*</span>
                     </Label>
-                    <div className="mt-1 space-y-2">
                       <div className="flex items-center space-x-2 mb-2">
                         <Checkbox
                           id="startNow"
                           checked={startNow}
                           onCheckedChange={(checked) => setStartNow(checked as boolean)}
                         />
-                        <Label htmlFor="startNow" className="cursor-pointer">
-                          Start Now
+                      <Label htmlFor="startNow" className="cursor-pointer font-normal">
+                        Start auction immediately upon creation
                         </Label>
-                        <div className="text-sm text-muted-foreground">(Auction will start immediately)</div>
                       </div>
                     
                       {!startNow && (
@@ -611,7 +616,7 @@ const CreateAuctionPage: React.FC = () => {
                                 className={cn(
                                   "w-full justify-start text-left font-normal",
                                   !startDate && "text-muted-foreground",
-                                  formErrors.startDate && "border-red-500"
+                                (formErrors.startDate || formErrors.startTime) && "border-red-500"
                                 )}
                               >
                                 <Calendar className="mr-2 h-4 w-4" />
@@ -624,13 +629,16 @@ const CreateAuctionPage: React.FC = () => {
                                 selected={startDate}
                                 onSelect={setStartDate}
                                 initialFocus
-                                disabled={(date) => date < new Date()}
+                              disabled={(date) => isBefore(date, startOfDay(new Date()))} 
                               />
                             </PopoverContent>
                           </Popover>
+                        {formErrors.startDate && (
+                           <p className="text-sm text-red-500">{formErrors.startDate}</p>
+                        )}
                           
                           <div className="flex items-center space-x-2 mt-2">
-                            <div className="flex-1">
+                          <div className="flex-1 space-y-1">
                               <Label htmlFor="startHour">Hour (0-23)</Label>
                               <Input
                                 id="startHour"
@@ -638,16 +646,16 @@ const CreateAuctionPage: React.FC = () => {
                                 min="0"
                                 max="23"
                                 value={startHour}
-                                onChange={(e) => setStartHour(e.target.value)}
-                                placeholder="14"
+                              onChange={(e) => setStartHour(e.target.value.padStart(2, '0'))}
+                              placeholder="HH"
                                 className={cn(formErrors.startHour && "border-red-500")}
                               />
                               {formErrors.startHour && (
                                 <p className="text-sm text-red-500">{formErrors.startHour}</p>
                               )}
                             </div>
-                            
-                            <div className="flex-1">
+                          <div className="font-bold">:</div>
+                          <div className="flex-1 space-y-1">
                               <Label htmlFor="startMinute">Minute (0-59)</Label>
                               <Input
                                 id="startMinute"
@@ -655,8 +663,8 @@ const CreateAuctionPage: React.FC = () => {
                                 min="0"
                                 max="59"
                                 value={startMinute}
-                                onChange={(e) => setStartMinute(e.target.value)}
-                                placeholder="00"
+                              onChange={(e) => setStartMinute(e.target.value.padStart(2, '0'))}
+                              placeholder="MM"
                                 className={cn(formErrors.startMinute && "border-red-500")}
                               />
                               {formErrors.startMinute && (
@@ -665,51 +673,40 @@ const CreateAuctionPage: React.FC = () => {
                             </div>
                           </div>
                         </>
-                      )}
-                      
-                      {startNow && (
-                        <div className="text-sm text-muted-foreground italic my-2 p-2 bg-muted rounded">
-                          Date and time inputs are disabled as the auction will start immediately upon creation
-                        </div>
-                      )}
-                    </div>
-                    {formErrors.startDate && (
-                      <p className="text-sm text-red-500">{formErrors.startDate}</p>
                     )}
                     {formErrors.startTime && (
-                      <p className="text-sm text-red-500">{formErrors.startTime}</p>
+                      <p className="text-sm text-red-500 mt-1">{formErrors.startTime}</p>
                     )}
                   </div>
                   
-                  <div>
+                  <div className="space-y-1">
                     <Label htmlFor="endDate">
                       End Date & Time <span className="text-red-500">*</span>
                     </Label>
-                    <div className="mt-1 space-y-2">
                       <div className="flex items-center space-x-2 mb-2">
                         <Checkbox
-                          id="endAfter24h"
-                          checked={endAfter24h}
+                        id="endAfterDefault"
+                        checked={endAfterDefault}
                           onCheckedChange={(checked) => {
-                            setEndAfter24h(!!checked);
-                            if (checked) {
-                              const start = startNow ? new Date() : getDateWithTime(startDate, startHour, startMinute);
-                              if (start) {
-                                const end = new Date(start.getTime() + 24 * 60 * 60 * 1000);
-                                setEndDate(end);
-                                setEndHour(end.getHours().toString().padStart(2, '0'));
-                                setEndMinute(end.getMinutes().toString().padStart(2, '0'));
+                             setEndAfterDefault(checked as boolean);
+                             if (checked && durationSettings) {
+                                const startDateTime = startNow ? new Date() : getDateWithTime(startDate, startHour, startMinute);
+                                if (startDateTime) {
+                                    const defaultEnd = addMinutes(startDateTime, durationSettings.default);
+                                    setEndDate(defaultEnd);
+                                    setEndHour(defaultEnd.getHours().toString().padStart(2, '0'));
+                                    setEndMinute(defaultEnd.getMinutes().toString().padStart(2, '0'));
                               }
                             }
                           }}
+                        disabled={!durationSettings || isFetchingSettings}
                         />
-                        <Label htmlFor="endAfter24h" className="cursor-pointer">
-                          End After 24 Hours
+                      <Label htmlFor="endAfterDefault" className="cursor-pointer font-normal">
+                        End after default duration ({durationSettings ? formatDurationForMessage(durationSettings.default) : 'loading...'}) 
                         </Label>
-                        <div className="text-sm text-muted-foreground">(From start time)</div>
                       </div>
 
-                      {!endAfter24h && (
+                    {!endAfterDefault && (
                         <>
                           <Popover>
                             <PopoverTrigger asChild>
@@ -718,9 +715,9 @@ const CreateAuctionPage: React.FC = () => {
                                 className={cn(
                                   "w-full justify-start text-left font-normal",
                                   !endDate && "text-muted-foreground",
-                                  formErrors.endDate && "border-red-500"
+                                (formErrors.endDate || formErrors.endTime) && "border-red-500"
                                 )}
-                                disabled={isFetchingSettings || !currentStartDateTime} 
+                              disabled={isFetchingSettings || !currentStartDateTime} 
                               >
                                 <Calendar className="mr-2 h-4 w-4" />
                                 {endDate ? format(endDate, "PPP") : <span>Pick a date</span>}
@@ -732,19 +729,22 @@ const CreateAuctionPage: React.FC = () => {
                                 selected={endDate}
                                 onSelect={setEndDate}
                                 initialFocus
-                                fromDate={minEndDateForCalendar} 
-                                toDate={maxEndDateForCalendar} 
-                                disabled={(date) => 
-                                  (minEndDateForCalendar && date < minEndDateForCalendar) ||
-                                  (maxEndDateForCalendar && date > maxEndDateForCalendar) ||
-                                  date < new Date(new Date().setHours(0,0,0,0)) 
-                                }
+                              fromDate={minEndDateForCalendar} 
+                              toDate={maxEndDateForCalendar} 
+                              disabled={(date) => 
+                                (minEndDateForCalendar && isBefore(date, minEndDateForCalendar)) ||
+                                (maxEndDateForCalendar && isBefore(maxEndDateForCalendar, date)) ||
+                                false 
+                              }
                               />
                             </PopoverContent>
                           </Popover>
+                        {formErrors.endDate && (
+                           <p className="text-sm text-red-500">{formErrors.endDate}</p>
+                        )}
                           
                           <div className="flex items-center space-x-2 mt-2">
-                            <div className="flex-1">
+                           <div className="flex-1 space-y-1">
                               <Label htmlFor="endHour">Hour (0-23)</Label>
                               <Input
                                 id="endHour"
@@ -752,17 +752,17 @@ const CreateAuctionPage: React.FC = () => {
                                 min="0"
                                 max="23"
                                 value={endHour}
-                                onChange={(e) => setEndHour(e.target.value)}
-                                placeholder="14"
+                              onChange={(e) => setEndHour(e.target.value.padStart(2, '0'))}
+                              placeholder="HH"
                                 className={cn(formErrors.endHour && "border-red-500")}
-                                disabled={isFetchingSettings}
+                              disabled={isFetchingSettings}
                               />
                               {formErrors.endHour && (
                                 <p className="text-sm text-red-500">{formErrors.endHour}</p>
                               )}
                             </div>
-                            
-                            <div className="flex-1">
+                           <div className="font-bold">:</div>
+                          <div className="flex-1 space-y-1">
                               <Label htmlFor="endMinute">Minute (0-59)</Label>
                               <Input
                                 id="endMinute"
@@ -770,10 +770,10 @@ const CreateAuctionPage: React.FC = () => {
                                 min="0"
                                 max="59"
                                 value={endMinute}
-                                onChange={(e) => setEndMinute(e.target.value)}
-                                placeholder="00"
+                              onChange={(e) => setEndMinute(e.target.value.padStart(2, '0'))}
+                              placeholder="MM"
                                 className={cn(formErrors.endMinute && "border-red-500")}
-                                disabled={isFetchingSettings}
+                              disabled={isFetchingSettings}
                               />
                               {formErrors.endMinute && (
                                 <p className="text-sm text-red-500">{formErrors.endMinute}</p>
@@ -781,19 +781,9 @@ const CreateAuctionPage: React.FC = () => {
                             </div>
                           </div>
                         </>
-                      )}
-                      
-                      {endAfter24h && (
-                        <div className="text-sm text-muted-foreground italic my-2 p-2 bg-muted rounded">
-                          The auction will end exactly 24 hours after it starts
-                        </div>
-                      )}
-                    </div>
-                    {formErrors.endDate && (
-                      <p className="text-sm text-red-500">{formErrors.endDate}</p>
                     )}
                     {formErrors.endTime && (
-                      <p className="text-sm text-red-500">{formErrors.endTime}</p>
+                      <p className="text-sm text-red-500 mt-1">{formErrors.endTime}</p>
                     )}
                   </div>
                 </div>
@@ -803,17 +793,11 @@ const CreateAuctionPage: React.FC = () => {
                   {isFetchingSettings ? (
                      <p className="text-xs text-muted-foreground">Loading duration rules...</p>
                   ) : durationSettings ? (
-                    <ul className="text-xs text-muted-foreground space-y-1 list-disc pl-4">
-                      <li>
-                        Min Duration: Auctions must run for at least 
-                        {` ${durationSettings.min} hours (${Math.ceil(durationSettings.min / 24)} day(s))`}
-                      </li>
-                      <li>
-                        Max Duration: Auctions cannot run for more than 
-                        {` ${durationSettings.max} hours (${Math.floor(durationSettings.max / 24)} day(s))`}
-                      </li>
-                      <li>Scheduling: You can start an auction immediately or schedule it for the future</li>
-                    </ul>
+                  <ul className="text-xs text-muted-foreground space-y-1 list-disc pl-4">
+                      <li>Min Duration: {formatDurationForMessage(durationSettings.min)}</li>
+                      <li>Max Duration: {formatDurationForMessage(durationSettings.max)}</li>
+                      <li>Default Duration: {formatDurationForMessage(durationSettings.default)}</li>
+                  </ul>
                   ) : (
                      <p className="text-xs text-yellow-600">Could not load duration rules. Using defaults.</p>
                   )}
@@ -830,19 +814,19 @@ const CreateAuctionPage: React.FC = () => {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="space-y-6">
+              <div className="space-y-1">
                 <div className="flex items-center space-x-2">
                   <Checkbox
                     id="isVisible"
                     checked={isVisible}
                     onCheckedChange={(checked) => setIsVisible(checked as boolean)}
                   />
-                  <Label htmlFor="isVisible" className="cursor-pointer">
+                  <Label htmlFor="isVisible" className="cursor-pointer font-normal">
                     Publicly Visible
                   </Label>
                 </div>
-                <p className="text-sm text-gray-500">
-                  If unchecked, the auction will not be visible in public listings
+                <p className="text-xs text-gray-500 pl-6">
+                  Uncheck to hide the auction from public listings (e.g., for private sales).
                 </p>
               </div>
             </CardContent>
@@ -851,11 +835,14 @@ const CreateAuctionPage: React.FC = () => {
           {settingsError && (
             <div className="flex items-center space-x-2 text-sm text-yellow-600 bg-yellow-50 p-3 rounded-md mb-4">
               <AlertCircle className="h-4 w-4" />
-              <span>{settingsError} Using default durations: Min {durationSettings?.min || 'N/A'}h, Max {durationSettings?.max || 'N/A'}h, Default {durationSettings?.default || 'N/A'}h.</span>
+              <span>{settingsError} Using fallback durations: Min {durationSettings?.min ? formatDurationForMessage(durationSettings.min) : 'N/A'}, Max {durationSettings?.max ? formatDurationForMessage(durationSettings.max) : 'N/A'}, Default {durationSettings?.default ? formatDurationForMessage(durationSettings.default) : 'N/A'}.</span>
             </div>
           )}
+           {formErrors.durationSettings && (
+                <p className="text-sm text-red-500 mb-4">{formErrors.durationSettings}</p>
+            )}
           
-          <div className="flex justify-between">
+          <div className="flex justify-between items-center mt-6">
             <Button 
               type="button" 
               variant="outline" 
