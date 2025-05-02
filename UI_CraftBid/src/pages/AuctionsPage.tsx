@@ -6,6 +6,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Loader2 } from "lucide-react";
 import Card from '@/components/auctions/card';
 import Navbar from '@/components/ui/navbar';
+import { useAuth } from '@/contexts/AuthContext';
+import Hero from '@/components/auctions/hero';
 
 export interface Auction {
     id: number;
@@ -36,7 +38,6 @@ export interface Auction {
 }
 
 const AuctionsPage: React.FC = () => {
-    const navigate = useNavigate();
     const [auctions, setAuctions] = useState<Auction[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -46,6 +47,7 @@ const AuctionsPage: React.FC = () => {
         sort: 'end_date',
         sortDirection: 'asc',
     });
+    const {user} = useAuth();
 
     const fetchAuctions = async () => {
         try {
@@ -71,10 +73,6 @@ const AuctionsPage: React.FC = () => {
         setFilters(prev => ({ ...prev, [key]: value }));
     };
 
-    const handleAuctionClick = (auctionId: number) => {
-        navigate(`/auctions/${auctionId}`);
-    };
-
     if (loading) {
         return (
             <div className="flex justify-center items-center min-h-screen">
@@ -92,8 +90,9 @@ const AuctionsPage: React.FC = () => {
     }
 
     return (
-        <>
+        <div className="bg-blancasi-500 min-h-screen">
             <Navbar />
+            {!user && <Hero />}
             <div className="container mx-auto py-8">
                 <div className="flex justify-between items-center mb-8">
                     <h1 className="text-3xl font-bold">Active Auctions</h1>
@@ -146,7 +145,7 @@ const AuctionsPage: React.FC = () => {
                         </div>
                     )}
             </div>
-        </>
+        </div>
     );
 };
 
