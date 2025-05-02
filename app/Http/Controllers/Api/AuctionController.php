@@ -11,7 +11,15 @@ class AuctionController extends Controller
 
     public function index(Request $request)
     {
-        $query = Auction::with(['product.images', 'artisan.user'])
+        $query = Auction::with([
+            'product.images',
+            'artisan' => function ($query) {
+                $query->select('id', 'user_id', 'business_name'); 
+            },
+            'artisan.user' => function ($query) {
+                $query->select('id', 'name'); 
+            }
+        ])
             ->where('is_visible', true)
             ->where(function ($q) {
                 $q->where('status', 'active')

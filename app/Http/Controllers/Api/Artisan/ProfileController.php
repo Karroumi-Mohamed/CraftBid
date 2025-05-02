@@ -23,6 +23,7 @@ class ProfileController extends Controller
 
         try {
             $validated = $request->validate([
+                'business_name' => 'required|string|max:255',
                 'speciality' => 'required|string|max:255',
                 'bio' => 'required|string|max:1000',
                 'location' => 'required|string|max:255',
@@ -30,7 +31,7 @@ class ProfileController extends Controller
             ]);
 
             $artisanData = [
-                'business_name' => $user->name,
+                'business_name' => $validated['business_name'],
                 'speciality' => $validated['speciality'],
                 'bio' => $validated['bio'],
                 'location' => $validated['location'],
@@ -48,6 +49,8 @@ class ProfileController extends Controller
                 ['user_id' => $user->id],
                 $artisanData
             );
+
+            $artisanProfile->load('user:id,name,email');
 
             return response()->json($artisanProfile, 200);
 
