@@ -1,0 +1,164 @@
+
+.aurora-glow {
+  background: radial-gradient(circle at 30% 107%, rgba(74, 222, 128, 0.07) 0%, rgba(74, 222, 128, 0.03) 5%, transparent 45%);
+  animation: aurora-shift 8s ease-in-out infinite alternate;
+  mix-blend-mode: soft-light;
+}
+
+.aurora-glow-winning {
+  background: 
+    radial-gradient(circle at 30% 107%, rgba(74, 222, 128, 0.3) 0%, rgba(74, 222, 128, 0.15) 8%, transparent 45%),
+    radial-gradient(circle at 70% 30%, rgba(74, 222, 128, 0.25) 0%, rgba(74, 222, 128, 0.1) 10%, transparent 50%);
+  animation: 
+    aurora-shift-winning 6s ease-in-out infinite alternate,
+    aurora-pulse 3s ease-in-out infinite;
+  mix-blend-mode: soft-light;
+}
+
+.price-aurora {
+  background: radial-gradient(circle at 50% 50%, rgba(74, 222, 128, 0.06) 0%, transparent 70%);
+  opacity: 0.6;
+  animation: price-shift 8s ease-in-out infinite alternate;
+}
+
+.price-aurora-winning {
+  background: 
+    radial-gradient(circle at 30% 50%, rgba(74, 222, 128, 0.35) 0%, rgba(74, 222, 128, 0.15) 25%, transparent 60%),
+    radial-gradient(circle at 70% 50%, rgba(74, 222, 128, 0.25) 0%, transparent 60%);
+  animation: 
+    price-shift-winning 6s ease-in-out infinite alternate, 
+    price-pulse 4s ease-in-out infinite;
+}
+
+.trophy-pulse {
+  animation: trophy-pulse 2s ease-in-out infinite;
+  position: relative;
+}
+
+.alert-pulse {
+  animation: alert-pulse 3s ease-in-out infinite;
+}
+
+.auction-box-winning {
+  position: relative;
+  transition: all 0.3s ease;
+}
+
+.auction-box-winning::before {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  z-index: -1;
+  background: linear-gradient(45deg, rgba(74, 222, 128, 0.3), transparent, rgba(74, 222, 128, 0.3));
+  border-radius: 1.5rem;
+  animation: border-shine 3s linear infinite;
+}
+
+.price-glow-winning {
+  position: relative;
+  box-shadow: 0 0 15px rgba(74, 222, 128, 0.2);
+  transition: all 0.3s ease;
+}
+
+@keyframes aurora-shift {
+  0% {
+    background-position: 0% 0%;
+  }
+  100% {
+    background-position: 100% 100%;
+  }
+}
+
+@keyframes aurora-shift-winning {
+  0% {
+    background-position: 0% 0%;
+  }
+  50% {
+    background-position: 30% 50%;
+  }
+  100% {
+    background-position: 100% 100%;
+  }
+}
+
+@keyframes aurora-pulse {
+  0% {
+    opacity: 0.8;
+  }
+  50% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0.8;
+  }
+}
+
+@keyframes price-shift {
+  0% {
+    transform: scale(1);
+    opacity: 0.6;
+  }
+  100% {
+    transform: scale(1.05);
+    opacity: 0.8;
+  }
+}
+
+@keyframes price-shift-winning {
+  0% {
+    background-position: 0% 0%;
+    transform: scale(1);
+  }
+  50% {
+    background-position: 50% 50%;
+  }
+  100% {
+    background-position: 100% 100%;
+    transform: scale(1.1);
+  }
+}
+
+@keyframes price-pulse {
+  0% {
+    opacity: 0.8;
+  }
+  50% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0.8;
+  }
+}
+
+@keyframes trophy-pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(74, 222, 128, 0.2);
+  }
+  70% {
+    box-shadow: 0 0 0 6px rgba(74, 222, 128, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(74, 222, 128, 0);
+  }
+}
+
+@keyframes alert-pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(217, 119, 6, 0.2);
+  }
+  70% {
+    box-shadow: 0 0 0 6px rgba(217, 119, 6, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(217, 119, 6, 0);
+  }
+}
+
+@keyframes border-shine {
+  0% {
+    background-position: 0% 0%;
+  }
+  100% {
+    background-position: 200% 200%;
+  }
+} 
