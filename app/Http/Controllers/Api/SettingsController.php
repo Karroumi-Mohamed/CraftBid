@@ -9,19 +9,18 @@ use App\Helpers\SettingsHelper;
 
 class SettingsController extends Controller
 {
-
     public function getAuctionDurationSettings(): JsonResponse
     {
-        $minDurationHours = SettingsHelper::get('min_auction_duration_hours', 24);
-        $maxDurationDays = SettingsHelper::get('max_auction_duration_days', 30);
-        $defaultDurationHours = SettingsHelper::get('default_auction_duration_hours', 168);
+        $minDurationMinutes = SettingsHelper::get('min_auction_duration_minutes', 1); 
+        $maxDurationHours = SettingsHelper::get('max_auction_duration_hours', 336); 
+        $defaultDurationMinutes = SettingsHelper::get('default_auction_duration_minutes', 60 * 24 * 7); 
 
-        $maxDurationHours = $maxDurationDays * 24;
+        $maxDurationMinutes = $maxDurationHours * 60;
 
         return response()->json([
-            'min' => (int)$minDurationHours,
-            'max' => (int)$maxDurationHours,
-            'default' => (int)$defaultDurationHours,
+            'min' => (int)$minDurationMinutes,
+            'max' => (int)$maxDurationMinutes,
+            'default' => (int)$defaultDurationMinutes,
         ]);
     }
 }

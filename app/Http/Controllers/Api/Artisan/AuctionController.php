@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use App\Helpers\SettingsHelper;
 use Carbon\Carbon;
+use Illuminate\Validation\ValidationException;
 
 class AuctionController extends Controller
 {
@@ -30,64 +31,76 @@ class AuctionController extends Controller
 
     public function store(Request $request)
     {
-        $minDurationHours = (int)SettingsHelper::get('min_auction_duration_hours', 1);
-        $maxDurationDays = (int)SettingsHelper::get('max_auction_duration_days', 14);
-        $maxDurationHours = $maxDurationDays * 24;
+        $minDurationMinutes = (int)SettingsHelper::get('min_auction_duration_minutes', 1);
+        $maxDurationHours = (int)SettingsHelper::get('max_auction_duration_hours', 336);
+        $maxDurationMinutes = $maxDurationHours * 60;
 
         $rules = [
             'product_id' => 'required|integer|exists:products,id',
             'reserve_price' => 'required|numeric|min:1',
             'bid_increment' => 'required|numeric|min:0.01',
-            'quantity' => 'integer|min:1',
-            'is_visible' => 'boolean',
+            'quantity' => 'sometimes|integer|min:1',
+            'is_visible' => 'sometimes|boolean',
             'properties' => 'nullable|json',
-            'start_now' => 'boolean',
-            'end_date' => 'required_without:end_after_hours|nullable|date',
-            'end_after_hours' => 'required_without:end_date|nullable|integer|min:' . $minDurationHours . '|max:' . $maxDurationHours,
+            'start_now' => 'sometimes|boolean',
+            'start_date' => 'required_if:start_now,false|nullable|date',
+            'end_date' => 'required|date',
         ];
-
-        if (!$request->input('start_now', false)) {
-            $rules['start_date'] = 'required|date';
-        }
 
         $validator = validator($request->all(), $rules);
 
-        $validator->after(function ($validator) use ($request, $minDurationHours, $maxDurationHours) {
+        $validator->after(function ($validator) use ($request, $minDurationMinutes, $maxDurationMinutes) {
             $now = Carbon::now();
-            $startDate = $request->input('start_now', false) ? $now : new Carbon($request->start_date);
-
-            if (!$request->input('start_now', false) && $startDate->lt($now)) {
-                $validator->errors()->add('start_date', 'The auction start date must be in the future.');
-            }
-
+            $startDate = null;
             $endDate = null;
-            $durationHours = null;
-            if ($request->filled('end_date')) {
-                $endDate = new Carbon($request->end_date);
-                if ($endDate->lte($startDate)) {
-                    $validator->errors()->add('end_date', 'End date must be after start date.');
+
+            if ($request->input('start_now', false)) {
+                $startDate = $now;
+            } elseif ($request->filled('start_date')) {
+                try {
+                    $startDate = Carbon::parse($request->start_date);
+                    if ($startDate->lt($now->subMinute())) {
+                        $validator->errors()->add('start_date', 'The auction start date cannot be in the past.');
+                    }
+                } catch (\Exception $e) {
+                    $validator->errors()->add('start_date', 'Invalid start date format.');
                     return;
                 }
-                $durationHours = $startDate->diffInHours($endDate);
-            } elseif ($request->filled('end_after_hours')) {
-                $durationHours = (int)$request->end_after_hours;
-                $endDate = (clone $startDate)->addHours($durationHours);
             } else {
-                $validator->errors()->add('end_date', 'Either End Date or End After Hours is required.');
+                $validator->errors()->add('start_date', 'Start date is required if Start Now is not checked.');
                 return;
             }
 
-            if ($durationHours < $minDurationHours) {
+            if ($request->filled('end_date')) {
+                try {
+                    $endDate = Carbon::parse($request->end_date);
+                } catch (\Exception $e) {
+                    $validator->errors()->add('end_date', 'Invalid end date format.');
+                    return;
+                }
+            } else {
+                $validator->errors()->add('end_date', 'End date is required.');
+                return;
+            }
+
+                if ($endDate->lte($startDate)) {
+                    $validator->errors()->add('end_date', 'End date must be after start date.');
+                return;
+            }
+
+            $durationMinutes = $startDate->diffInMinutes($endDate);
+
+            if ($durationMinutes < $minDurationMinutes) {
                 $validator->errors()->add(
-                    'end_after_hours',
-                    "The auction must run for at least {$minDurationHours} hour(s)."
+                    'end_date',
+                    "The auction must run for at least {$minDurationMinutes} minute(s)."
                 );
             }
 
-            if ($durationHours > $maxDurationHours) {
+            if ($durationMinutes > $maxDurationMinutes) {
                 $validator->errors()->add(
-                    'end_after_hours',
-                    "The auction cannot run for more than {$maxDurationHours} hours ({$maxDurationDays} days)."
+                    'end_date',
+                    "The auction cannot run for more than {$maxDurationMinutes} minutes ({$maxDurationHours} hours)."
                 );
             }
         });
@@ -128,12 +141,8 @@ class AuctionController extends Controller
             ], 422);
         }
 
-        $startDate = $request->input('start_now', false) ? Carbon::now() : new Carbon($validatedData['start_date']);
-        if ($request->filled('end_after_hours')) {
-            $endDate = (clone $startDate)->addHours((int)$validatedData['end_after_hours']);
-        } else {
-            $endDate = new Carbon($validatedData['end_date']);
-        }
+        $startDate = $request->input('start_now', false) ? Carbon::now() : Carbon::parse($validatedData['start_date']);
+        $endDate = Carbon::parse($validatedData['end_date']);
 
         DB::beginTransaction();
         try {
@@ -143,14 +152,14 @@ class AuctionController extends Controller
                 'reserve_price' => $validatedData['reserve_price'],
                 'price' => $validatedData['reserve_price'],
                 'bid_increment' => $validatedData['bid_increment'],
-                'quantity' => $request->has('quantity') ? $validatedData['quantity'] : 1,
+                'quantity' => $request->input('quantity', 1),
                 'start_date' => $startDate,
                 'end_date' => $endDate,
                 'status' => $request->input('start_now', false) ? 'active' : 'pending',
                 'type' => 'standard',
                 'anti_sniping' => true,
-                'is_visible' => $request->has('is_visible') ? $validatedData['is_visible'] : true,
-                'properties' => $request->properties ?? null,
+                'is_visible' => $request->input('is_visible', true),
+                'properties' => $request->input('properties'),
             ]);
 
             $auction->save();

@@ -15,7 +15,7 @@ return new class extends Migration
             $table->id();
             $table->foreignId('wallet_id')->constrained()->cascadeOnDelete();
             $table->decimal('amount', 10, 2);
-            $table->enum('type', ['deposit', 'withdrawal', 'payment', 'refund', 'bid_hold', 'bid_release']);
+            $table->enum('type', ['deposit', 'withdrawal', 'payment', 'payout', 'commission', 'refund', 'bid_hold', 'bid_release']);
             $table->text('description')->nullable();
             $table->foreignId('auction_id')->nullable()->constrained()->nullOnDelete();
             $table->string('reference_code')->nullable()->unique(); // Unique reference if needed

@@ -13,6 +13,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
+use App\Helpers\SettingsHelper;
 
 class BidController extends Controller
 {
@@ -136,12 +137,18 @@ class BidController extends Controller
                 'winner_id' => $bidder->id,
             ]);
 
-            if ($auction->anti_sniping) {
+            $antiSnipingEnabled = SettingsHelper::get('anti_sniping_enabled', 'true') === 'true';
+            if ($antiSnipingEnabled) {
                 $timeLeft = now()->diffInSeconds($auction->end_date);
-                if ($timeLeft > 0 && $timeLeft <= 300) {
-                    $auction->end_date = $auction->end_date->addMinutes(5);
+                $extensionMinutes = (int)SettingsHelper::get('anti_sniping_extension_minutes', 5);
+                if ($timeLeft > 0 && $timeLeft <= ($extensionMinutes * 60)) {
+                    $auction->end_date = $auction->end_date->addMinutes($extensionMinutes);
                     $auction->save();
-                    Log::info('Anti-sniping triggered, auction extended.', ['auction_id' => $auction->id, 'new_end_date' => $auction->end_date]);
+                    Log::info('Anti-sniping triggered, auction extended.', [
+                        'auction_id' => $auction->id, 
+                        'extension_minutes' => $extensionMinutes,
+                        'new_end_date' => $auction->end_date
+                    ]);
                 }
             }
 
