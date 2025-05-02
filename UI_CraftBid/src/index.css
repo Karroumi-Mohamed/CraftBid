@@ -158,6 +158,36 @@
     src: local('Montserrat'), url('./assets/montserrat/Montserrat-BlackItalic.woff') format('woff');
 }
 
+@font-face {
+    font-family: 'Lora';
+    font-style: normal;
+    font-weight: 400;
+    src: local('Lora'), url('./assets/lora/Lora-Regular.woff') format('woff');
+}
+
+@font-face {
+    font-family: 'Lora';
+    font-style: italic;
+    font-weight: 400;
+    src: local('Lora'), url('./assets/lora/Lora-Italic.woff') format('woff');
+}
+
+@font-face {
+    font-family: 'Lora';
+    font-style: normal;
+    font-weight: 700;
+    src: local('Lora'), url('./assets/lora/Lora-Bold.woff') format('woff');
+}
+
+@font-face {
+    font-family: 'Lora';
+    font-style: italic;
+    font-weight: 700;
+    src: local('Lora'), url('./assets/lora/Lora-BoldItalic.woff') format('woff');
+}
+
+
+
 
 @theme {
     --color-blancasi-500: oklch(0.99 0.0262 102.21);
@@ -169,6 +199,7 @@
     --font-bodoni: 'Bodoni', serif;
     --font-montserrat: 'Montserrat', sans-serif;
     --font-open-sans: 'Open Sans', sans-serif;
+    --font-lora: 'Lora', serif;
 }
 
 body {

@@ -28,6 +28,7 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "date-fns": "^4.1.0",
+    "framer-motion": "^12.9.4",
     "laravel-echo": "^2.0.2",
     "lucide-react": "^0.501.0",
     "pusher-js": "^8.4.0",
