@@ -88,11 +88,7 @@ const router = createBrowserRouter([
   },
   {
     path: "/upload-id",
-    element: (
-      <ProtectedRoute>
-        <ArtisanIdUploadPage />
-      </ProtectedRoute>
-    ),
+    element: <ArtisanIdUploadPage />,
   },
   {
     path: "/dashboard",
