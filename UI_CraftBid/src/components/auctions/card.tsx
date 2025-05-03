@@ -1,7 +1,10 @@
 import { Auction } from "@/pages/AuctionsPage"
 import { Link } from "react-router-dom"
 import { differenceInSeconds, parseISO } from "date-fns"
-import { useState } from "react"
+import { useState, useEffect } from "react"
+import { Heart } from "lucide-react"
+import { useAuth } from "@/contexts/AuthContext"
+import api, { makeRequest } from "@/lib/axois"
 
 interface CardProps {
     auction: Auction
@@ -66,85 +69,139 @@ const formatRemainingTime = (endDateString: string): string => {
 };
 
 export default function Card({ auction }: CardProps) {
+    const { user } = useAuth();
     const [remainingTime, setRemainingTime] = useState<string>(() => formatRemainingTime(auction.end_date));
-    const image =  'http://localhost:8000/storage/' +  (auction.product.images.length > 0 ? auction.product.images.find(image => image.is_primary)?.path : auction.product.images[0]?.path);
+    const [isWatched, setIsWatched] = useState<boolean>(false);
+    const [isLoading, setIsLoading] = useState<boolean>(false);
+    const image = 'http://localhost:8000/storage/' + (auction.product.images.length > 0 ? auction.product.images.find(image => image.is_primary)?.path : auction.product.images[0]?.path);
+    
+    useEffect(() => {
+        if (user) {
+            checkWatchlistStatus();
+        }
+    }, [user, auction.id]);
+    
+    useEffect(() => {
+        const timer = setInterval(() => {
+            setRemainingTime(formatRemainingTime(auction.end_date));
+        }, 60000);
+        
+        return () => clearInterval(timer);
+    }, [auction.end_date]);
+    
+    const checkWatchlistStatus = async () => {
+        try {
+            const response = await makeRequest(api.get(`/watchlist/check/${auction.id}`));
+            if (response.success) {
+                setIsWatched(response.data.is_watched);
+            }
+        } catch (error) {
+            console.error("Error checking watchlist status:", error);
+        }
+    };
+    
+    const toggleWatchlist = async (e: React.MouseEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        
+        if (!user) {
+            window.location.href = "/login";
+            return;
+        }
+        
+        setIsLoading(true);
+        try {
+            if (isWatched) {
+                const response = await makeRequest(api.delete(`/watchlist/${auction.id}`));
+                if (response.success) {
+                    setIsWatched(false);
+                }
+            } else {
+                const response = await makeRequest(api.post('/watchlist', { auction_id: auction.id }));
+                if (response.success) {
+                    setIsWatched(true);
+                }
+            }
+        } catch (error) {
+            console.error("Error toggling watchlist:", error);
+        } finally {
+            setIsLoading(false);
+        }
+    };
+    
     return (
-        <div className="h-96 aspect-[0.696/1] bg-white rounded-3xl border-black border-1 p-2">
-            <div className="w-full aspect-square bg-black rounded-2xl mb-1.5">
+        <div className="h-auto bg-white rounded-3xl border border-gray-200 p-3 shadow-sm hover:shadow-md transition-shadow overflow-hidden flex flex-col">
+            <div className="relative">
+                {user && (
+                    <button 
+                        onClick={toggleWatchlist}
+                        disabled={isLoading}
+                        className={`absolute top-3 right-3 z-10 p-2.5 rounded-full ${isWatched ? 'bg-accent1/20' : 'bg-black/40'} hover:bg-accent1/30 transition-colors`}
+                    >
+                        <Heart 
+                            size={20} 
+                            className={`${isWatched ? 'fill-accent1 text-accent1' : 'text-white'} transition-colors`} 
+                        />
+                    </button>
+                )}
+                
                 <Link
                     to={`/auctions/${auction.id}`}
-                    className="block w-full h-full bg-black rounded-2xl"
+                    className="block aspect-square bg-gray-100 rounded-2xl mb-3 overflow-hidden"
                 >
                     {image && (
                         <img
                             src={image}
-                            className="w-full h-full object-cover rounded-2xl"
+                            className="w-full h-full object-cover rounded-2xl hover:scale-105 transition-transform duration-300"
+                            alt={auction.product.name}
                         />
                     )}
                 </Link>
             </div>
-            <div className="flex justify-between items-center mb-1">
+            
+            <div className="flex justify-between items-start mb-2 flex-grow">
                 <div className="flex flex-col">
-                    <span className="text-[9px] font-semibold font-montserrat text-black hover:underline hover:italic leading-2">
-                        <Link
-                            to={`/auctions/${auction.id}`}>
-                            by: {namify(auction.artisan.business_name)}
+                    <span className="text-xs font-medium font-montserrat text-gray-600 hover:underline hover:text-accent1 transition-colors">
+                        <Link to={`/artisans/${auction.artisan.id}`}>
+                            by {namify(auction.artisan.business_name)}
                         </Link>
                     </span>
-                    <span className="font-bold text-sm font-montserrat text-black hover:underline hover:italic">
-                        <Link
-                            to={`/auctions/${auction.id}`}>
+                    <h3 className="font-bold text-base font-montserrat text-black hover:text-accent1 transition-colors line-clamp-2">
+                        <Link to={`/auctions/${auction.id}`}>
                             {auction.product.name}
                         </Link>
-                    </span>
+                    </h3>
                 </div>
-                <div>
-                    <span className="text-3xl font-bold font-montserrat text-black italic">
-                        {auction.price.toLocaleString('en-US', {
-                            style: 'currency',
-                            currency: 'USD',
-                        })}
-                        <span className="text-[12px] font-bold font-montserrat text-black hover:underline hover:italic leading-2">
-                            DH
-                        </span>
+                <div className="text-right">
+                    <span className="text-xs font-medium font-montserrat text-gray-500">
+                        {auction.bid_count} {auction.bid_count === 1 ? 'Bid' : 'Bids'}
                     </span>
                 </div>
             </div>
-            <div className="h-8 overflow-hidden flex items-center justify-between">
-                <div className="relative w-2/3">
-                    <p className="text-[7px] relative font-semibold font-montserrat text-black leading-2.5 w-full">
-                        {auction.product.description}
-                    </p>
-                    <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-b from-[#ffffff88] via-[#ffffffef] via-40% from-0% to-white to-100%"></div>
-                </div>
-                <span className="text-[12px] font-semibold font-montserrat text-gray-400 hover:underline hover:italic leading-2.5">
-                    {auction.bid_count} Bids</span>
+            
+            <div className="h-10 mb-3 overflow-hidden">
+                <p className="text-xs text-gray-600 font-montserrat line-clamp-2">
+                    {auction.product.description}
+                </p>
             </div>
 
-            <div className=" w-full h-8 flex items-center justify-between bg-black rounded-2xl">
-                <Link
-                    to={`/auctions/${auction.id}`}
-                    className="block w-full bg-black rounded-full px-3 py-1 text-white mt-auto"
-                >
-                    <div className="flex justify-between items-center">
-                        <div className="flex items-baseline">
-                            <span className="text-xl font-semibold italic font-montserrat">
-                                {typeof auction.price === 'number' ? auction.price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : parseFloat(auction.price).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                            </span>
-                            <span className="text-[9px] italic font-semibold font-montserrat ml-1">
-                                DH
-                            </span>
-                        </div>
-                        <div className="text-right">
-                            <span className="block text-[9px] font-medium font-montserrat text-white leading-none opacity-90">
-                                {remainingTime !== "Ended" ? "remaining" : "Status"}
-                            </span>
-                            <span className="block text-xs font-medium font-montserrat leading-tight">
-                                {remainingTime}
-                            </span>
-                        </div>
-                    </div>
-                </Link>
+            <div className="w-full flex items-center justify-between bg-black rounded-xl py-2 px-3 mt-auto">
+                <div className="flex items-baseline">
+                    <span className="text-xl font-semibold italic font-montserrat text-white">
+                        {parseFloat(auction.price.toString()).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </span>
+                    <span className="text-xs italic font-semibold font-montserrat ml-1 text-white">
+                        DH
+                    </span>
+                </div>
+                <div className="text-right">
+                    <span className="block text-xs font-medium font-montserrat text-white leading-none opacity-75">
+                        {remainingTime !== "Ended" ? "remaining" : "ended"}
+                    </span>
+                    <span className="block text-sm font-medium font-montserrat text-white leading-tight">
+                        {remainingTime}
+                    </span>
+                </div>
             </div>
         </div>
     )
