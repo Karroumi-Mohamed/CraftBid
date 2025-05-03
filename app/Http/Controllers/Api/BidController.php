@@ -200,4 +200,107 @@ class BidController extends Controller
 
         return response()->json($bids);
     }
+    
+    public function getUserBids(Request $request)
+    {
+        $user = Auth::user();
+        $status = $request->query('status');
+        $perPage = $request->query('per_page', 10);
+        
+        $userAuctions = Auction::whereHas('bids', function($query) use ($user) {
+            $query->where('user_id', $user->id);
+        })
+        ->with([
+            'product.images', 
+            'product.category',
+            'artisan.user',
+            'bids' => function($query) use ($user) {
+                $query->where('user_id', $user->id)->orderBy('created_at', 'desc');
+            }
+        ])
+        ->get();
+        
+        $groupedByAuction = [];
+        
+        foreach ($userAuctions as $auction) {
+            if (!$auction->product) {
+                continue;
+            }
+            
+            $imageUrl = null;
+            if ($auction->product->images->isNotEmpty()) {
+                $primaryImage = $auction->product->images->firstWhere('is_primary', true) 
+                    ?? $auction->product->images->first();
+                if ($primaryImage) {
+                    $imageUrl = url('storage/' . $primaryImage->path);
+                }
+            }
+            
+            $userHasWinningBid = $auction->bids->contains('is_winning', true);
+            
+            $auctionOverallStatus = '';
+            if ($auction->status === 'ended') {
+                $auctionOverallStatus = $userHasWinningBid ? 'won' : 'lost';
+            } else {
+                $auctionOverallStatus = $userHasWinningBid ? 'winning' : 'outbid';
+            }
+            
+            if ($status && $auctionOverallStatus !== $status) {
+                continue;
+            }
+            
+            $highestUserBid = $auction->bids->max('amount') ?? 0;
+            
+            $formattedBids = $auction->bids->map(function($bid) {
+                return [
+                    'id' => $bid->id,
+                    'amount' => $bid->amount,
+                    'created_at' => $bid->created_at,
+                    'is_winning' => $bid->is_winning,
+                    'status' => $bid->status
+                ];
+            })->all();
+            
+            $groupedByAuction[] = [
+                'auction_id' => $auction->id,
+                'auction_title' => $auction->product->name ?? 'Unknown Product',
+                'auction_end_date' => $auction->end_date,
+                'auction_status' => $auction->status,
+                'current_price' => $auction->price,
+                'image_url' => $imageUrl,
+                'category' => $auction->product->category->name ?? 'Uncategorized',
+                'artisan_name' => $auction->artisan->user->name ?? 'Unknown Artisan',
+                'product' => [
+                    'id' => $auction->product->id,
+                    'name' => $auction->product->name,
+                    'description' => $auction->product->description,
+                    'image_url' => $imageUrl
+                ],
+                'bids' => $formattedBids,
+                'highest_user_bid' => $highestUserBid,
+                'user_is_winning' => $userHasWinningBid,
+                'overall_status' => $auctionOverallStatus
+            ];
+        }
+        
+        $page = $request->input('page', 1);
+        $total = count($groupedByAuction);
+        $lastPage = max((int)ceil($total / $perPage), 1);
+        $page = min($page, $lastPage);
+        
+        $offset = ($page - 1) * $perPage;
+        $items = array_slice($groupedByAuction, $offset, $perPage);
+        
+        $result = [
+            'current_page' => (int)$page,
+            'data' => $items,
+            'from' => $offset + 1,
+            'last_page' => $lastPage,
+            'per_page' => (int)$perPage,
+            'to' => min($offset + $perPage, $total),
+            'total' => $total,
+        ];
+        
+        return response()->json($result);
+    }
 }
