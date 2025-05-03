@@ -3,7 +3,6 @@ import { Link, Outlet } from 'react-router-dom';
 import LogoutButton from '../auth/LogoutButton';
 import { useAuth } from '@/contexts/AuthContext';
 import { LayoutDashboard, Users, Shapes, Settings, ShieldCheck, Gavel, Banknote, FileText } from 'lucide-react';
-import Navbar from '../ui/navbar';
 
 const AdminSidebar: React.FC = () => {
   const { user } = useAuth();
@@ -64,7 +63,6 @@ const AdminSidebar: React.FC = () => {
   );
 };
 
-
 const AdminLayout: React.FC = () => {
   const { user, isLoading } = useAuth();
 
@@ -77,15 +75,12 @@ const AdminLayout: React.FC = () => {
   }
 
   return (
-    <>
-    <Navbar />
     <div className="flex min-h-screen bg-background text-foreground">
       <AdminSidebar />
       <main className="flex-1 p-6 lg:p-8 overflow-y-auto bg-gray-50 dark:bg-gray-900/50">
         <Outlet />
       </main>
     </div>
-    </>
   );
 };
 

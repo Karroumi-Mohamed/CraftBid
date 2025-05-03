@@ -89,7 +89,7 @@ const AuthLayout: React.FC<AuthLayoutProps> = ({ children }) => {
                  </div>
             </div>
 
-            <div className="w-full h-full ml-auto rounded-lg shadow-md bg-white font-montserrat">
+            <div className="w-full h-full ml-auto rounded-lg shadow-md bg-white font-montserrat overflow-y-auto">
                 {children}
             </div>
         </div>
