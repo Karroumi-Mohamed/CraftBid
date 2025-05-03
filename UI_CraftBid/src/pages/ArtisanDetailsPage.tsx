@@ -71,6 +71,7 @@ const ArtisanDetailsPage: React.FC = () => {
         setErrors({});
 
         const formData = new FormData();
+        formData.append('business_name', user?.name || '');
         formData.append('speciality', speciality);
         formData.append('bio', bio);
         formData.append('location', locationInput);

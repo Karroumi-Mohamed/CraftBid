@@ -12,6 +12,7 @@ interface User {
     email: string;
     roles: { id: number; name: string }[];
     email_verified_at: string | null;
+    avatar?: string | null;
 }
 
 interface VerificationStatusResponse {
@@ -33,6 +34,7 @@ interface AuthContextType {
     logout: () => Promise<ApiResponse<any>>;
     register: (data: any) => Promise<ApiResponse<any>>;
     checkAuthStatus: () => Promise<ApiResponse<User>>; 
+    refreshUser: () => Promise<ApiResponse<User>>;
     checkEmailVerification: (data: { id: string; hash: string }) => Promise<ApiResponse<any>>;
     resendVerificationEmail: (data: { email: string }) => Promise<ApiResponse<any>>;
 }
@@ -238,6 +240,28 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         }
     };
 
+    const refreshUser = async (): Promise<ApiResponse<User>> => {
+        try {
+            const response = await makeRequest<User>(api.get('/user'));
+            if (response.success && response.data) {
+                setUser(response.data);
+            }
+            return response;
+        } catch (error: any) {
+            console.error("Failed to refresh user data:", error);
+            const apiError: ApiError = {
+                message: error.message || "Failed to refresh user data",
+                status: error.response?.status
+            };
+            return {
+                success: false,
+                data: null,
+                error: apiError,
+                status: apiError.status
+            };
+        }
+    };
+
     const register = async (data: any): Promise<ApiResponse<any>> => {
         setIsLoading(true);
         let response: ApiResponse<any>;
@@ -331,6 +355,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         logout,
         register,
         checkAuthStatus,
+        refreshUser,
         checkEmailVerification,
         resendVerificationEmail
     };

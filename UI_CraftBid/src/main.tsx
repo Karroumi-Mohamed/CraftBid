@@ -24,9 +24,7 @@ import AuctionDetailPage from './pages/AuctionDetailPage';
 import ArtisanProductsPage from './pages/dashboard/ArtisanProductsPage';
 import ArtisanAuctionsPage from './pages/dashboard/ArtisanAuctionsPage';
 import CreateAuctionPage from './pages/dashboard/CreateAuctionPage';
-import ArtisanProfilePage from './pages/dashboard/ArtisanProfilePage';
 import BuyerBidsPage from './pages/dashboard/BuyerBidsPage';
-import WatchlistPage from './pages/dashboard/WatchlistPage';
 import WalletPage from './pages/dashboard/WalletPage';
 import SettingsPage from './pages/dashboard/SettingsPage';
 import AdminLayout from './components/layouts/AdminLayout';
@@ -42,6 +40,7 @@ import AddProductPage from './pages/dashboard/AddProductPage';
 import EditProductPage from './pages/dashboard/EditProductPage';
 import AdminWithdrawalManagementPage from './pages/admin/AdminWithdrawalManagementPage';
 import AdminFinancialReportsPage from './pages/admin/AdminFinancialReportsPage';
+import ProfilePage from './pages/dashboard/ProfilePage';
 
 const router = createBrowserRouter([
   {
@@ -106,12 +105,11 @@ const router = createBrowserRouter([
       { path: "my-products/edit/:id", element: <EditProductPage /> },
       { path: "my-auctions", element: <ArtisanAuctionsPage /> },
       { path: "my-auctions/create", element: <CreateAuctionPage /> },
-      { path: "artisan-profile", element: <ArtisanProfilePage /> },
+      { path: "profile", element: <ProfilePage /> },
       { path: "my-bids", element: <BuyerBidsPage /> },
-      { path: "watchlist", element: <WatchlistPage /> },
+      { path: "watchlist", element: <Navigate to="/auctions" replace /> },
       { path: "wallet", element: <WalletPage /> },
-      { path: "settings", element: <SettingsPage /> },
-      { path: "profile", element: <ArtisanProfilePage /> }
+      { path: "settings", element: <SettingsPage /> }
     ]
   },
   {
