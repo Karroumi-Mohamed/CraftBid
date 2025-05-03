@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Auction;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 
 class AuctionController extends Controller
 {
@@ -25,46 +26,10 @@ class AuctionController extends Controller
                 $q->where('status', 'active')
                   ->orWhere('status', 'pending');
             });
-            
-        if ($request->has('category_id')) {
-            $query->whereHas('product', function ($q) use ($request) {
-                $q->where('category_id', $request->category_id);
-            });
-        }
         
-        if ($request->has('type')) {
-            $query->where('type', $request->type);
-        }
+        $query->orderBy('end_date', 'asc');
         
-        if ($request->has('artisan_id')) {
-            $query->where('artisan_id', $request->artisan_id);
-        }
-        
-        if ($request->has('search')) {
-            $search = $request->search;
-            $query->whereHas('product', function ($q) use ($search) {
-                $q->where('name', 'like', "%{$search}%")
-                  ->orWhere('description', 'like', "%{$search}%");
-            });
-        }
-        
-        $sortField = $request->input('sort_by', 'end_date');
-        $sortDirection = $request->input('sort_direction', 'asc');
-        
-        $allowedSortFields = ['end_date', 'start_date', 'price', 'bid_count', 'created_at'];
-        if (!in_array($sortField, $allowedSortFields)) {
-            $sortField = 'end_date';
-        }
-        
-        if (!in_array($sortDirection, ['asc', 'desc'])) {
-            $sortDirection = 'asc';
-        }
-        
-        $query->orderBy($sortField, $sortDirection);
-        
-        if (!$request->has('sort_by')) {
-            $query->orderByRaw("CASE WHEN type = 'featured' THEN 0 ELSE 1 END");
-        }
+        $query->orderByRaw("CASE WHEN type = 'featured' THEN 0 ELSE 1 END");
         
         $auctions = $query->paginate($request->input('per_page', 12));
         
