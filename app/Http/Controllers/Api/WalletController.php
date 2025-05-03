@@ -32,7 +32,33 @@ class WalletController extends Controller
             return response()->json(['error' => 'Wallet not found.'], 404);
         }
 
-        return response()->json(['balance' => $wallet->balance]);
+        $bidHoldTotal = $user->bids()
+            ->where('status', 'pending')
+            ->where('is_winning', true)
+            ->sum('amount');
+
+        $totalDeposits = $wallet->transactions()
+            ->where('type', 'deposit')
+            ->where('status', 'completed')
+            ->sum('amount');
+
+        $totalWithdrawn = $wallet->transactions()
+            ->where('type', 'withdrawal')
+            ->where('status', 'completed') 
+            ->sum('amount');
+        
+        return response()->json([
+            'balance' => $wallet->balance,
+            'bid_hold_total' => $bidHoldTotal,
+            'total_deposits' => $totalDeposits,
+            'total_withdrawn' => $totalWithdrawn,
+            'formatted' => [
+                'balance' => number_format($wallet->balance, 2),
+                'bid_hold_total' => number_format($bidHoldTotal, 2),
+                'total_deposits' => number_format($totalDeposits, 2),
+                'total_withdrawn' => number_format($totalWithdrawn, 2),
+            ]
+        ]);
     }
 
     public function indexTransactions(Request $request)

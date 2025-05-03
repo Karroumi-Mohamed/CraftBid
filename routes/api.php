@@ -11,6 +11,7 @@ use App\Http\Controllers\Api\Artisan\AuctionController;
 use App\Http\Controllers\Api\UserController;
 use App\Http\Controllers\Api\BidController;
 use App\Http\Controllers\Api\WalletController;
+use App\Http\Controllers\Api\WatchlistController;
 use App\Http\Controllers\Api\Admin\WalletController as AdminWalletController;
 use App\Http\Controllers\Api\Admin\FinancialReportController;
 use App\Http\Controllers\Api\Admin\SettingsController as AdminSettingsController;
@@ -116,6 +117,13 @@ Route::middleware(['auth:sanctum'])->group(function () {
     });
 
     Route::get('/settings/auction-duration', [GeneralSettingsController::class, 'getAuctionDurationSettings'])->name('settings.auction-duration');
+    
+    Route::prefix('watchlist')->name('watchlist.')->controller(WatchlistController::class)->group(function () {
+        Route::get('/', 'index')->name('index');
+        Route::post('/', 'store')->name('store');
+        Route::delete('/{auctionId}', 'destroy')->name('destroy');
+        Route::get('/check/{auctionId}', 'check')->name('check');
+    });
 });
 
 Route::middleware('auth:sanctum')->group(function () {
@@ -130,10 +138,22 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::post('/user/change-password', [UserController::class, 'changePassword'])
         ->name('user.change-password');
+        
+    Route::post('/profile/update', [UserController::class, 'updateProfile'])
+        ->name('profile.update');
 
     Route::post('/auctions/{auction}/bids', [BidController::class, 'store'])->name('bids.store');
     Route::get('/auctions/{auction}/bids', [BidController::class, 'history'])->name('bids.history');
     Route::get('/user/bids', [BidController::class, 'userHistory'])->name('bids.user-history');
+
+    Route::get('/wallet/balance', [WalletController::class, 'showBalance'])->name('wallet.balance');
+    Route::get('/wallet/transactions', [WalletController::class, 'indexTransactions'])->name('wallet.transactions');
+    Route::post('/wallet/withdrawal-requests', [WalletController::class, 'storeWithdrawalRequest'])->name('wallet.withdrawalRequests.store');
+    Route::post('/wallet/manual-deposit', [WalletController::class, 'storeManualDeposit'])->name('wallet.manualDeposit');
+
+    Route::get('/bids', [BidController::class, 'getUserBids'])->name('bids.user');
+    Route::get('/auctions/{auction}/bids', [BidController::class, 'history'])->name('auctions.bids');
+    Route::post('/auctions/{auction}/bids', [BidController::class, 'store'])->name('auctions.bids.store');
 });
 
 Route::middleware('web')->group(function () {

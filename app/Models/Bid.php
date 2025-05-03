@@ -24,6 +24,27 @@ class Bid extends Model
         'is_winning' => 'boolean',
     ];
 
+    protected $appends = ['status'];
+
+    public function getStatusAttribute()
+    {
+        if ($this->auction && $this->auction->status === 'ended') {
+            if ($this->is_winning) {
+                return 'won';
+            }
+            return 'lost';
+        }
+        
+        if ($this->auction && $this->auction->status === 'active') {
+            if ($this->is_winning) {
+                return 'winning';
+            }
+            return 'outbid';
+        }
+        
+        return 'outbid';
+    }
+
     public function auction(): BelongsTo
     {
         return $this->belongsTo(Auction::class);
