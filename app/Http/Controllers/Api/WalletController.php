@@ -33,7 +33,6 @@ class WalletController extends Controller
         }
 
         $bidHoldTotal = $user->bids()
-            ->where('status', 'pending')
             ->where('is_winning', true)
             ->sum('amount');
 
